@@ -23,5 +23,5 @@ cloudstream {
     )
 
 
-    iconUrl = "https://www.google.com/s2/favicons?domain=pelismart.com&sz=24"
+    iconUrl = "https://www.google.com/s2/favicons?domain=pelismart.com&sz=%size%"
 }

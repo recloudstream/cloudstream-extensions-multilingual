@@ -24,5 +24,5 @@ cloudstream {
     )
 
 
-    iconUrl = "https://www.google.com/s2/favicons?domain=aniplay.it&sz=24"
+    iconUrl = "https://www.google.com/s2/favicons?domain=aniplay.it&sz=%size%"
 }

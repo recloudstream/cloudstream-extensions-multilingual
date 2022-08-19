@@ -23,5 +23,5 @@ cloudstream {
         "TvSeries",
         "Movie",
     )
-    iconUrl = "https://www.google.com/s2/favicons?domain=akwam.to&sz=24"
+    iconUrl = "https://www.google.com/s2/favicons?domain=akwam.to&sz=%size%"
 }

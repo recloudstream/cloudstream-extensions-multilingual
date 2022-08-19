@@ -23,5 +23,5 @@ cloudstream {
         "OVA",
     )
 
-    iconUrl = "https://www.google.com/s2/favicons?domain=otakudesu.watch&sz=24"
+    iconUrl = "https://www.google.com/s2/favicons?domain=otakudesu.watch&sz=%size%"
 }

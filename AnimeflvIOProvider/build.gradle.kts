@@ -23,5 +23,5 @@ cloudstream {
         "OVA",
     )
 
-    iconUrl = "https://www.google.com/s2/favicons?domain=animeflv.io&sz=24"
+    iconUrl = "https://www.google.com/s2/favicons?domain=animeflv.io&sz=%size%"
 }
