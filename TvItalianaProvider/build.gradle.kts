@@ -3,6 +3,7 @@ version = 1
 
 
 cloudstream {
+    language = "it"
     // All of these properties are optional, you can safely remove them
 
     // description = "Lorem Ipsum"
@@ -20,5 +21,5 @@ cloudstream {
         "Live",
     )
 
-    iconUrl = "https://www.google.com/s2/favicons?domain=github.com&sz=24"
+    iconUrl = "https://www.google.com/s2/favicons?domain=github.com&sz=%size%"
 }
