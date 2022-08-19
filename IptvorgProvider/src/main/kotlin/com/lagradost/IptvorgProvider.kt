@@ -34,8 +34,8 @@ class IptvorgProvider : MainAPI() {
                 LoadData(channelUrl, nationName, nationPoster, 0).toJson(),
                 this.name,
                 TvType.TvSeries,
-                nationPoster
-
+                nationPoster,
+                lang = channelUrl.substringAfterLast("/").substringBeforeLast(".")
             )
         }
         return HomePageResponse(
@@ -58,7 +58,7 @@ class IptvorgProvider : MainAPI() {
             LiveSearchResponse(
                 channelname,
                 LoadData(streamurl, channelname, posterurl, 1).toJson(),
-                this@iptvorgProvider.name,
+                this@IptvorgProvider.name,
                 TvType.Live,
                 posterurl,
             )
@@ -117,7 +117,7 @@ class IptvorgProvider : MainAPI() {
         val loadData = parseJson<LoadData>(data)
         callback.invoke(
             ExtractorLink(
-                this.name,
+                this@IptvorgProvider.name,
                 loadData.channelName,
                 loadData.url,
                 "",
