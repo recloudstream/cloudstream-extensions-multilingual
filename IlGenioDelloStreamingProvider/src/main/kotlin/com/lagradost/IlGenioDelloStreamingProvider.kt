@@ -43,7 +43,7 @@ class IlGenioDelloStreamingProvider : MainAPI() {
                 link,
                 this.name,
                 TvType.Movie,
-                it.selectFirst("img")!!.attr("data-src-img"),
+                it.selectFirst("img")!!.attr("src"),
                 null,
                 null,
                 quality = quality
@@ -58,7 +58,7 @@ class IlGenioDelloStreamingProvider : MainAPI() {
         val doc = app.get(url,referer= mainUrl ).document
         return doc.select("div.result-item").map {
             val href = it.selectFirst("div.image > div > a")!!.attr("href")
-            val poster = it.selectFirst("div.image > div > a > img")!!.attr("data-src-img")
+            val poster = it.selectFirst("div.image > div > a > img")!!.attr("src")
             val name = it.selectFirst("div.details > div.title > a")!!.text().substringBeforeLast("(").substringBeforeLast("[")
             MovieSearchResponse(
                 name,
@@ -84,11 +84,11 @@ class IlGenioDelloStreamingProvider : MainAPI() {
             year = year.dropLast(4)
         }
 
-        val poster = document.selectFirst("div.poster > img")!!.attr("data-src-img")
+        val poster = document.selectFirst("div.poster > img")!!.attr("src")
 
         val recomm = document.select("article.w_item_b").map {
             val href = it.selectFirst("a")!!.attr("href")
-            val posterUrl = it.selectFirst("img")!!.attr("data-src-img")
+            val posterUrl = it.selectFirst("img")!!.attr("src")
             val name = it.selectFirst("div.data > h3")!!.text().substringBeforeLast("(").substringBeforeLast("[")
             MovieSearchResponse(
                 name,

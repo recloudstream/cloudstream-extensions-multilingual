@@ -3,7 +3,6 @@ version = 1
 
 
 cloudstream {
-    language = "it"
     // All of these properties are optional, you can safely remove them
 
     // description = "Lorem Ipsum"
@@ -16,12 +15,10 @@ cloudstream {
      * 2: Slow
      * 3: Beta only
      * */
-    status = 0 // will be 3 if unspecified
+    status = 1 // will be 3 if unspecified
     tvTypes = listOf(
-        "TvSeries",
-        "Movie",
+        "Live",
     )
 
-
-    iconUrl = "https://www.google.com/s2/favicons?domain=tantifilm.autos&sz=%size%"
+    iconUrl = "https://www.google.com/s2/favicons?domain=calciostreaming.live&sz=24"
 }

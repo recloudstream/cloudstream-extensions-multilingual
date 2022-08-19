@@ -5,6 +5,7 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addAniListId
 import com.lagradost.cloudstream3.LoadResponse.Companion.addDuration
 import com.lagradost.cloudstream3.LoadResponse.Companion.addMalId
+import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.utils.Qualities
@@ -93,7 +94,7 @@ class AniPlayProvider : MainAPI() {
     )
 
     private suspend fun ApiSeason.toEpisodeList(url: String) : List<Episode> {
-        return app.get("$url/season/${this.id}").parsed<List<ApiEpisode>>().mapNotNull { it.toEpisode() }
+        return parseJson<List<ApiEpisode>>(app.get("$url/season/${this.id}").text).mapNotNull { it.toEpisode() }
     }
 
     data class ApiAnime(
@@ -115,7 +116,7 @@ class AniPlayProvider : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request : MainPageRequest): HomePageResponse {
-        val response = app.get("$mainUrl/api/home/latest-episodes?page=0").parsed<List<ApiMainPageAnime>>()
+        val response = parseJson<List<ApiMainPageAnime>>(app.get("$mainUrl/api/home/latest-episodes?page=0").text)
 
         val results = response.map{
             val isDub = isDub(it.title)
@@ -133,7 +134,7 @@ class AniPlayProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val response = app.get("$mainUrl/api/anime/advanced-search?page=0&size=36&query=$query").parsed<List<ApiSearchResult>>()
+        val response = parseJson<List<ApiSearchResult>>(app.get("$mainUrl/api/anime/advanced-search?page=0&size=36&query=$query").text)
 
         return response.map {
             val isDub = isDub(it.title)
@@ -151,7 +152,7 @@ class AniPlayProvider : MainAPI() {
 
     override suspend fun load(url: String): LoadResponse {
 
-        val response = app.get(url).parsed<ApiAnime>()
+        val response = parseJson<ApiAnime>(app.get(url).text)
 
         val tags: List<String> = response.genres.map { it.name }
 
@@ -182,7 +183,7 @@ class AniPlayProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
 
-        val episode = app.get(data).parsed<ApiEpisodeUrl>()
+        val episode = parseJson<ApiEpisodeUrl>(app.get(data).text)
 
         if(episode.url.contains(".m3u8")){
             val m3u8Helper = M3u8Helper()
