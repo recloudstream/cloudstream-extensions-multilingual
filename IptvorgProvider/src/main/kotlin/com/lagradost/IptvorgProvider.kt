@@ -81,7 +81,7 @@ class IptvorgProvider : MainAPI() {
                     LoadData(streamurl, channelname, posterurl, 0).toJson(),
                     channelname,
                     null,
-                    index+1,
+                    index + 1,
                     posterurl
                 )
             }
