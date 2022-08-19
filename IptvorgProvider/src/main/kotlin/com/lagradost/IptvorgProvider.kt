@@ -75,7 +75,6 @@ class IptvorgProvider : MainAPI() {
                 val streamurl = channel.url.toString()
                 val channelname = channel.title.toString()
                 val posterurl = channel.attributes["tvg-logo"].toString()
-
                 Episode(
                     LoadData(streamurl, channelname, posterurl, 0).toJson(),
                     channelname,
