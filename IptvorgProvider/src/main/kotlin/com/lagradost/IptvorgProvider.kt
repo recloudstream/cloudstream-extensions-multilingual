@@ -1,4 +1,4 @@
-package com.lagradost.cloudstream3
+package com.lagradost
 
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.AppUtils.toJson
