@@ -29,7 +29,6 @@ class IptvorgProvider : MainAPI() {
             val nationPoster = "https://github.com/emcrisostomo/flags/raw/master/png/256/${channelUrl
                 .substringAfterLast("/")
                 .substringBeforeLast(".").uppercase()}.png"
-            //posterfromname(nationName.substringAfter(" "))
             LiveSearchResponse(
                 nationName,
                 LoadData(channelUrl, nationName, nationPoster, 0).toJson(),
