@@ -35,7 +35,6 @@ class IptvorgProvider : MainAPI() {
                 this.name,
                 TvType.TvSeries,
                 nationPoster,
-                lang = channelUrl.substringAfterLast("/").substringBeforeLast(".")
             )
         }
         return HomePageResponse(
