@@ -4,6 +4,8 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
+import com.lagradost.cloudstream3.network.CloudflareKiller
+import okhttp3.Interceptor
 
 
 class TantifilmProvider : MainAPI() {
@@ -28,7 +30,8 @@ class TantifilmProvider : MainAPI() {
         request : MainPageRequest
     ): HomePageResponse {
         val url = request.data + page
-        val soup = app.get(url).document
+        val interceptor = CloudflareKiller()
+        val soup = app.get(url, interceptor = interceptor).document
         val home = soup.select("div.media3").map {
             val title = it.selectFirst("p")!!.text().substringBefore("(")
             val link = it.selectFirst("a")!!.attr("href")
@@ -48,7 +51,9 @@ class TantifilmProvider : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         val queryformatted = query.replace(" ", "+")
         val url = "$mainUrl/search/$queryformatted"
-        val doc = app.get(url).document
+
+        val interceptor = CloudflareKiller()
+        val doc = app.get(url, interceptor = interceptor).document
         return doc.select("div.film.film-2").map {
             val href = it.selectFirst("a")!!.attr("href")
             val poster = it.selectFirst("img")!!.attr("src")
@@ -66,7 +71,9 @@ class TantifilmProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val document = app.get(url).document
+
+        val interceptor = CloudflareKiller()
+        val document = app.get(url, interceptor = interceptor).document
         val type = if (document.selectFirst("div.category-film")!!.text().contains("Serie")
                 .not()
         ) TvType.Movie else TvType.TvSeries
@@ -107,7 +114,7 @@ class TantifilmProvider : MainAPI() {
         if (type == TvType.TvSeries) {
             val list = ArrayList<Pair<Int, String>>()
             val urlvideocontainer = document.selectFirst("iframe")!!.attr("src")
-            val videocontainer = app.get(urlvideocontainer).document
+            val videocontainer = app.get(urlvideocontainer, interceptor = interceptor).document
             videocontainer.select("nav.nav1 > select > option").forEach { element ->
                 val season = element.text().toIntOrNull()
                 val href = element.attr("value")
@@ -120,7 +127,7 @@ class TantifilmProvider : MainAPI() {
             val episodeList = ArrayList<Episode>()
 
             for ((season, seasonurl) in list) {
-                val seasonDocument = app.get(seasonurl).document
+                val seasonDocument = app.get(seasonurl, interceptor= interceptor).document
                 val episodes = seasonDocument.select("nav.second_nav > select > option")
                 if (episodes.isNotEmpty()) {
                     episodes.forEach { episode ->
@@ -221,7 +228,8 @@ class TantifilmProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val doc = app.get(data).document
+        val interceptor = CloudflareKiller()
+        val doc = app.get(data, interceptor = interceptor).document
         val iframe =
             doc.select("option").map { fixUrl(it.attr("value")) }.filter { it.contains("label") }
         iframe.forEach { id ->
