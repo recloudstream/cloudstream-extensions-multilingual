@@ -7,6 +7,7 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
 
 class PelisflixProvider : MainAPI() {
+    // Link not found anymore :(
     override var mainUrl = "https://pelisflix.li"
     override var name = "Pelisflix"
     override var lang = "es"
@@ -198,7 +199,7 @@ class PelisflixProvider : MainAPI() {
                 val postkey = iframe.replace("/stream/index.php?h=", "") // this obtains
                 // djNIdHNCR2lKTGpnc3YwK3pyRCs3L2xkQmljSUZ4ai9ibTcza0JRODNMcmFIZ0hPejdlYW0yanJIL2prQ1JCZA POST KEY
                 app.post(
-                    "https://pelisflix.li/stream/r.php",
+                    "$mainUrl/stream/r.php",
                     headers = mapOf(
                         "Host" to "pelisflix.li",
                         "User-Agent" to USER_AGENT,

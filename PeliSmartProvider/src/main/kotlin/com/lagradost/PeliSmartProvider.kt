@@ -1,10 +1,12 @@
 package com.lagradost
 
 import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
 
 class PeliSmartProvider: MainAPI() {
+    // Dead link
     override var mainUrl = "https://pelismart.com"
     override var name = "PeliSmart"
     override var lang = "es"
@@ -45,7 +47,7 @@ class PeliSmartProvider: MainAPI() {
 
                 items.add(HomePageList(name, home))
             } catch (e: Exception) {
-                e.printStackTrace()
+                logError(e)
             }
         }
 

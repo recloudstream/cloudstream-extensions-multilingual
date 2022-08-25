@@ -143,7 +143,6 @@ class PhimmoichillProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-
         val document = app.get(data).document
 
         val key = document.select("div#content script").mapNotNull { script ->
@@ -151,11 +150,15 @@ class PhimmoichillProvider : MainAPI() {
                 val id = script.data().substringAfter("filmInfo.episodeID = parseInt('")
                     .substringBefore("');")
                 app.post(
-                    url = "$mainUrl/pmplayer.php",
+                    // Not mainUrl
+                    url = "https://phimmoichills.net/pmplayer.php",
                     data = mapOf("qcao" to id),
                     referer = data,
-                    headers = mapOf("X-Requested-With" to "XMLHttpRequest")
-                ).text.substringAfterLast("iniPlayers(\"").substringBefore("\",")
+                    headers = mapOf(
+                        "X-Requested-With" to "XMLHttpRequest",
+                        "Content-Type" to "application/x-www-form-urlencoded; charset=UTF-8"
+                    )
+                ).text.also { println("HERERERR $it") }.substringAfterLast("iniPlayers(\"").substringBefore("\",")
             } else {
                 null
             }
