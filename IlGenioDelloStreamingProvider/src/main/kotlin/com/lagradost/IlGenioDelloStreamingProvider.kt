@@ -9,6 +9,7 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ShortLink
 import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Element
 
 
 class IlGenioDelloStreamingProvider : MainAPI() {
@@ -74,7 +75,7 @@ class IlGenioDelloStreamingProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse {
         val page = app.get(url)
         val document = page.document
-        val type = if (document.selectFirst("div.sgeneros")?.text() == "Serie TV"){TvType.TvSeries} else{TvType.Movie}
+        val type = if (document.select("div.seasons-wraper").isNotEmpty()){TvType.TvSeries} else{TvType.Movie}
         val title = document.selectFirst("div.data > h1")!!.text().substringBefore("(").substringBefore("[")
         val description = document.selectFirst("div#info")?.selectFirst("p")?.html()
         val rating = document.select("span.valor").last()?.text()?.split(" ")?.get(0)
@@ -104,23 +105,35 @@ class IlGenioDelloStreamingProvider : MainAPI() {
         if (type == TvType.TvSeries) {
 
             val episodeList = ArrayList<Episode>()
-            val seasons = document.selectFirst("div#info")?.select("p")?.map {it.children() }
-                ?.filter { it.size > 1 && it.first()!!.hasAttr("href") }
-                ?.map{(it.toString().split("<br>"))
-                    .map{Jsoup.parse(it).select("a")
-                        ?.map { it?.attr("href") }}}
-            seasons?.mapIndexed { season, element ->
-                element.mapIndexed { index, list ->
-                    val urls = list?.toJson()?:url
-                    episodeList.add(
-                        Episode(
-                            data = urls,
-                            episode = index + 1,
-                            season = season + 1
-                        )
-                    )
+            document.selectFirst("div.seasons-wraper")
+                ?.select("div.accordion-item ")?.groupBy {it.selectFirst("span.season-title")!!.text()  }?.map { seasons ->
+                    seasons.value.map {season -> season.select("div.episode-wrap")}.flatten()
+                        .groupBy { it.selectFirst("li.season-no")?.text()?.substringBeforeLast(" ") }
+                        .map { episodeItaSub ->
+                            val episodes = episodeItaSub.value
+                            val posterUrl = episodes.firstNotNullOf { it.selectFirst("img")?.attr("src")}
+                            val epName = episodes.firstNotNullOf{it.selectFirst("li.other_link")?.text()?:""}
+
+                            episodes.map{ episode ->
+                                val subtag = episode.selectFirst("li.season-no")?.text()?.takeIf {it.contains("Sub")}?.substringAfter(" ") ?: ""
+                                val urls = episode.getElementsByAttributeValue("target", "_blank").map { it.attr("href").trim() }
+                                    .filter { it.isNotEmpty()}.toJson()
+
+                                episodeList.add(Episode(
+                                    data = urls,
+                                    posterUrl = posterUrl,
+                                    season = seasons.key.toIntOrNull(),
+                                    name = "$epName ${subtag.uppercase()}",
+
+                                    ))
+                            }
+
+
+
+                        }
                 }
-            }
+
+
             val seasonnames = document.selectFirst("div#info")?.select("p")?.map {it.children() }
                 ?.filter { it.size<3 && it.isNotEmpty()}?.map{it.text()}
 
