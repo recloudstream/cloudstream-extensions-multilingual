@@ -76,7 +76,7 @@ class EurostreamingProvider : MainAPI() {
         val episodeList = ArrayList<Episode>()
         document.select("div.tab-pane.fade").map { element ->
             val season = element.attr("id").filter { it.isDigit() }.toInt()
-            element.select("li").map{episode ->
+            element.select("li").filter { it-> it.selectFirst("a")?.hasAttr("data-title")?:false }.map{episode ->
                 val data = episode.select("div.mirrors > a").map { it.attr("data-link") }.toJson()
                 val epTitle = episode.selectFirst("a")!!.attr("data-title")
                 episodeList.add(
