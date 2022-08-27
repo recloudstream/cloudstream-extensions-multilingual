@@ -80,12 +80,14 @@ class EurostreamingProvider : MainAPI() {
                 val data = episode.select("div.mirrors > a").map { it.attr("data-link") }.toJson()
                 val epnameData = episode.selectFirst("a")
                 val epTitle = epnameData!!.attr("data-title")
+                val epNum = epnameData.text().toInt()
                 episodeList.add(
                     Episode(
                         data,
                         epTitle,
-                        season
-                        epnameData.text().toInt()
+                        season,
+                        epNum
+
                     )
                 )
             }
