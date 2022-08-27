@@ -115,15 +115,16 @@ class IlGenioDelloStreamingProvider : MainAPI() {
                             val epName = episodes.firstNotNullOf{it.selectFirst("li.other_link")?.text()?:""}
 
                             episodes.map{ episode ->
-                                val subtag = episode.selectFirst("li.season-no")?.text()?.takeIf {it.contains("Sub")}?.substringAfter(" ") ?: ""
+                                val seasonNo =  episode.selectFirst("li.season-no")
+                                val subtag = seasonNo?.text()?.takeIf {it.contains("Sub")}?.substringAfter(" ") ?: ""
                                 val urls = episode.getElementsByAttributeValue("target", "_blank").map { it.attr("href").trim() }
                                     .filter { it.isNotEmpty()}.toJson()
-
                                 episodeList.add(Episode(
                                     data = urls,
                                     posterUrl = posterUrl,
                                     season = seasons.key.toIntOrNull(),
                                     name = "$epName ${subtag.uppercase()}",
+                                    episode = seasonNo?.text()?.substringAfter("x")?.filter { it.isDigit() }?.toIntOrNull()
 
                                     ))
                             }
