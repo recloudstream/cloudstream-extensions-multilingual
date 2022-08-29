@@ -21,7 +21,7 @@ class PinoyMoviePediaProvider : MainAPI() {
         val document = app.get(mainUrl).document
         val mainbody = document.getElementsByTag("body")
         // All rows will be hardcoded bc of the nature of the site
-        val rows: List<Pair<String, String>> = listOf(
+        val rows = listOf(
             Pair("Latest Movies", "featured-titles"),
             Pair("Movies", "dt-movies"),
             Pair("Digitally Restored", "genre_digitally-restored"),
@@ -29,8 +29,10 @@ class PinoyMoviePediaProvider : MainAPI() {
             Pair("Romance", "genre_romance"),
             Pair("Comedy", "genre_comedy"),
             Pair("Family", "genre_family")
-            //Pair("Adult +18", "genre_pinay-sexy-movies")
-        )
+        ).toMutableList()
+        if (settingsForProvider.enableAdult) {
+            rows.add(Pair("Adult +18", "genre_pinay-sexy-movies"))
+        }
         rows.forEach { item ->
             val title = item.first
             val inner = mainbody?.select("div#${item.second} > article")

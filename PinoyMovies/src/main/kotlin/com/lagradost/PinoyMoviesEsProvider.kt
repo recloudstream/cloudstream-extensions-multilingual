@@ -106,14 +106,19 @@ class PinoyMoviesEsProvider : MainAPI() {
                 all.addAll(homepage1)
             }
             //2nd rows
+            val listOfRows = listOf(
+                Pair("Action", "genre_action"),
+                Pair("Comedy", "genre_comedy"),
+                Pair("Romance", "genre_romance"),
+                Pair("Horror", "genre_horror")
+            ).toMutableList()
+            if (settingsForProvider.enableAdult) {
+                listOfRows.add(Pair("Rated-R", "genre_rated-r"))
+            }
             val homepage2 = getRowElements(
-                mainbody, listOf(
-                    Pair("Action", "genre_action"),
-                    Pair("Comedy", "genre_comedy"),
-                    Pair("Romance", "genre_romance"),
-                    Pair("Horror", "genre_horror")
-                    //Pair("Rated-R", "genre_rated-r")
-                ), "#"
+                mainbody = mainbody,
+                rows = listOfRows,
+                sep = "#"
             )
             if (homepage2.isNotEmpty()) {
                 all.addAll(homepage2)
@@ -127,7 +132,7 @@ class PinoyMoviesEsProvider : MainAPI() {
         val document = app.get(url, interceptor = DdosGuardKiller(true))
             .document.select("div#archive-content > article")
 
-        return document?.mapNotNull {
+        return document.mapNotNull {
             // Fetch details
             val urlTitle = it?.select("div.data") ?: return@mapNotNull null
             val link = urlTitle.select("a")?.attr("href") ?: return@mapNotNull null
