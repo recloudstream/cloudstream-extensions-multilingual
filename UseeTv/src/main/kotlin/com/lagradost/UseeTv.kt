@@ -15,33 +15,26 @@ class UseeTv : MainAPI() {
         TvType.Live
     )
 
+    companion object {
+        private const val mainLink = "https://streaming.useetv.com"
+    }
+
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val document = app.get("$mainUrl/tv/live").document
 
-        val homePageList = ArrayList<HomePageList>()
-
-        val tvAll = document.select("div#channelContainer div.col-channel").mapNotNull {
-            it.toSearchResult()
-        }
-        if (tvAll.isNotEmpty()) homePageList.add(HomePageList("Semua", tvAll, true))
-
-        val tvLocal =
-            document.select("div#channelContainer div.col-channel").mapNotNull { it }.filter {
-                it.attr("class").contains("local", true)
+        val home = listOf(
+            Pair("col-xs-4", "Semua"),
+            Pair("local", "Local"),
+            Pair("news", "News"),
+        ).map { (soap,name) ->
+            val home = document.select("div#channelContainer div.col-channel").mapNotNull { it }.filter {
+                it.attr("class").contains(soap, true)
             }.mapNotNull {
                 it.toSearchResult()
             }
-        if (tvLocal.isNotEmpty()) homePageList.add(HomePageList("Local", tvLocal, true))
-
-        val tvNews =
-            document.select("div#channelContainer div.col-channel").mapNotNull { it }.filter {
-                it.attr("class").contains("news", true)
-            }.mapNotNull {
-                it.toSearchResult()
-            }
-        if (tvNews.isNotEmpty()) homePageList.add(HomePageList("News", tvNews, true))
-
-        return HomePageResponse(homePageList)
+            HomePageList(name, home)
+        }.filter { it.list.isNotEmpty() }
+        return HomePageResponse(home)
 
     }
 
@@ -67,7 +60,6 @@ class UseeTv : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         val content = document.selectFirst("div.d-flex.video-schedule-time p")?.text()?.split("•")
-        val mainLink = "https://streaming.useetv.com"
         val link = document.select("script").findLast { it.data().contains("\$('.live').last()") }?.data()?.let{
             Regex("'$mainLink(.*)';var").find(it)?.groupValues?.getOrNull(1)
         }
@@ -77,7 +69,7 @@ class UseeTv : MainAPI() {
             this.name,
             "$mainLink$link",
             fixUrlNull(document.selectFirst("div.row.video-schedule img")?.attr("src")),
-            plot = "Live Now : ${document.selectFirst("div.row.video-schedule h5")?.text()}"
+            plot = document.selectFirst("title")?.text()
         )
     }
 
