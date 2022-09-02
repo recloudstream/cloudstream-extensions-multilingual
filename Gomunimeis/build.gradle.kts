@@ -1,12 +1,12 @@
 // use an integer for version numbers
-version = 2
+version = 1
 
 
 cloudstream {
     language = "id"
     // All of these properties are optional, you can safely remove them
 
-//     description = "Lorem Ipsum"
+    // description = "Lorem Ipsum"
      authors = listOf("Hexated")
 
     /**
@@ -16,12 +16,12 @@ cloudstream {
      * 2: Slow
      * 3: Beta only
      * */
-    status = 0 // will be 3 if unspecified
+    status = 1 // will be 3 if unspecified
     tvTypes = listOf(
         "AnimeMovie",
         "Anime",
         "OVA",
     )
 
-    iconUrl = "https://www.google.com/s2/favicons?domain=185.231.223.76&sz=%size%"
+    iconUrl = "https://www.google.com/s2/favicons?domain=gomunime.is&sz=%size%"
 }
