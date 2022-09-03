@@ -11,6 +11,7 @@ class Gomunimeis : MainAPI() {
     override var name = "Gomunime.is"
     override val hasMainPage = true
     override var lang = "id"
+    override val hasQuickSearch = true
     override val hasDownloadSupport = true
 
     override val supportedTypes = setOf(
@@ -71,6 +72,8 @@ class Gomunimeis : MainAPI() {
             addSub(totalEpisode?.toIntOrNull())
         }
     }
+
+    override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
     override suspend fun search(query: String): List<SearchResponse> {
         return app.get(
