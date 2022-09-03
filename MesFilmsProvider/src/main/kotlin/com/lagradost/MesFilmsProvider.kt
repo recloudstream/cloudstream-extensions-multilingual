@@ -87,16 +87,13 @@ class MesFilmsProvider : MainAPI() {
 
         val meta = document.selectFirst("div.sheader")
         val poster = meta?.select("div.poster > img")?.attr("data-src")
-        println(poster)
         val title = meta?.select("div.data > h1")?.text() ?: throw ErrorLoadingException("Invalid title")
-        println(title)
         val data = meta.select("div.data")
         val extra = data.select("div.extra")
 
         val description = extra.select("span.tagline").first()?.text()
 
         val ratingValue = data.select("div.dt_rating_data > div.starstruck-rating > span.dt_rating_vgs").first()?.text()
-        println(ratingValue)
         val rating = if (ratingValue == "0.0" || ratingValue.isNullOrEmpty()) {
             null // if empty or null, hide
             } else {
@@ -117,7 +114,7 @@ class MesFilmsProvider : MainAPI() {
         val trailerUrl = if (postId != null){
             val payloadRequest = mapOf("action" to "doo_player_ajax", "post" to postId, "nume" to "trailer", "type" to mediaType)
             val getTrailer =
-                app.post("https://mesfilms.pw/wp-admin/admin-ajax.php", headers = mapOf("Content-Type" to "application/x-www-form-urlencoded; charset=UTF-8"), data = payloadRequest).text
+                app.post("$mainUrl/wp-admin/admin-ajax.php", headers = mapOf("Content-Type" to "application/x-www-form-urlencoded; charset=UTF-8"), data = payloadRequest).text
             parseJson<EmbedUrlClass>(getTrailer).url
         } else {
             null
@@ -161,18 +158,13 @@ class MesFilmsProvider : MainAPI() {
 
                 val payloadRequest = mapOf("action" to "doo_player_ajax", "post" to postId, "nume" to indexOfPlayer, "type" to "movie")
                 val getPlayerEmbed =
-                    app.post("https://mesfilms.pw/wp-admin/admin-ajax.php", headers = mapOf("Content-Type" to "application/x-www-form-urlencoded; charset=UTF-8"), data = payloadRequest).text
+                    app.post("$mainUrl/wp-admin/admin-ajax.php", headers = mapOf("Content-Type" to "application/x-www-form-urlencoded; charset=UTF-8"), data = payloadRequest).text
                 val playerUrl = parseJson<EmbedUrlClass>(getPlayerEmbed).url
                 val additionalInfo = listOf(quality, languageInfo)
-                println("server: $server")
-                println("playerUrl: $playerUrl")
-                println("quality: $quality")
 
                 if (playerUrl != null)
                 loadExtractor(httpsify(playerUrl), playerUrl, subtitleCallback, callback, additionalInfo)
             }
-
-
         return true
     }
 
