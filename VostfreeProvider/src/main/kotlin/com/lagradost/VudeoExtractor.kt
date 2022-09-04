@@ -1,13 +1,14 @@
+
 package com.lagradost
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.app
 
 
-
 open class VudeoExtractor : ExtractorApi() {
     override val name: String = "Vudeo"
     override val mainUrl: String = "https://vudeo.io/"
-    private val srcRegex = Regex("""sources\: \[\"(.*)\"""")  // would be possible to use the parse and find src attribute
+    private val srcRegex =
+        Regex("""sources\: \[\"(.*)\"""")  // would be possible to use the parse and find src attribute
     override val requiresReferer = false
 
 
@@ -18,7 +19,7 @@ open class VudeoExtractor : ExtractorApi() {
                 return listOf(
                     ExtractorLink(
                         name,
-                        name ,
+                        name,
                         link,
                         cleaned_url, // voir si site demande le referer à mettre ici
                         Qualities.Unknown.value,
@@ -29,3 +30,5 @@ open class VudeoExtractor : ExtractorApi() {
         return null
     }
 }
+
+
