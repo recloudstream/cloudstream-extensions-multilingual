@@ -1,11 +1,11 @@
 package com.lagradost
 
-
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.utils.AppUtils.toJson
 import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
+import org.jsoup.nodes.Element
 
 
 class VostfreeProvider : MainAPI() {
@@ -15,10 +15,8 @@ class VostfreeProvider : MainAPI() {
     override val hasQuickSearch = false // recherche rapide (optionel, pas vraimet utile)
     override val hasMainPage = true // page d'accueil (optionel mais encoragé)
     override var lang = "fr" // fournisseur est en francais
-
-    //override val supportedTypes = setOf(TvType.Movie) // ici on ne supporte que les films
     override val supportedTypes =
-        setOf(TvType.Anime, TvType.AnimeMovie, TvType.OVA) // animes, animesfilms et series
+        setOf(TvType.Anime, TvType.AnimeMovie, TvType.OVA) // animes, animesfilms
     // liste des types: https://recloudstream.github.io/dokka/app/com.lagradost.cloudstream3/-tv-type/index.html
 
     /**
@@ -28,22 +26,17 @@ class VostfreeProvider : MainAPI() {
     Chaque classes nécessite des données différentes, mais a en commun le nom, le poster et l'url
      **/
     override suspend fun search(query: String): List<SearchResponse> {
-        //val link = "$mainUrl/?s=$query"
-        val link = "$mainUrl/index.php?story=$query&do=search&subaction=search"
-        // L'url pour chercher un anime de dragon sera donc: 'https://vostfree.cx/index.php?story=dragon&do=search&subaction=search'
-        // le $ dans une string permet d'insérer une variable
+        val link =
+            "$mainUrl/index.php?story=$query&do=search&subaction=search" // L'url pour chercher un anime de dragon sera donc: 'https://vostfree.cx/index.php?story=dragon&do=search&subaction=search'
         val document =
             app.get(link).document // app.get() permet de télécharger la page html avec une requete HTTP (get)
-        // on convertit le html en un document
         return document.select("div.search-result") // on séléctione tous les éléments 'enfant' du type articles
             .apmap { div -> // apmap crée une liste des éléments (ici newMovieSearchResponse et newAnimeSearchResponse)
-                //val posterContainer = div.selectFirst("> span.image ") // selectione le premier élément correspondant à ces critères
                 val type =
-                    div?.selectFirst("div.genre")?.text()?.replace("\t", "")?.replace("\n", "")
-                // replace enlève tous les '\t' et '\n' du titre
+                    div?.selectFirst("div.genre")?.text()?.replace("\t", "")
+                        ?.replace("\n", "")  // replace enlève tous les '\t' et '\n' du titre
                 val mediaPoster = mainUrl + div?.selectFirst("span.image > img")
                     ?.attr("src") // récupère le texte de l'attribut src de l'élément
-
                 val href = div?.selectFirst("div.info > div.title > a")?.attr("href")
                     ?: throw ErrorLoadingException("invalid link") // renvoie une erreur si il n'y a pas de lien vers le média
                 val title = div.selectFirst("> div.info > div.title > a")?.text().toString()
@@ -80,10 +73,6 @@ class VostfreeProvider : MainAPI() {
             }
     }
 
-    private data class EmbedUrlClass(
-        @JsonProperty("embed_url") val url: String?,
-    )
-
     /**
      * charge la page d'informations, il ya toutes les donées, les épisodes, le résumé etc ...
      * Il faut retourner soit: AnimeLoadResponse, MovieLoadResponse, TorrentLoadResponse, TvSeriesLoadResponse.
@@ -105,27 +94,25 @@ class VostfreeProvider : MainAPI() {
         var title = ""
 
         var description: String? = ""// first() selectione le premier élément de la liste
-
-/////////////////////////////////////////////////
         val isSaison = document.select("div.new_player_series_count > a")
         var saison00 = -1
         var i = 0
         var noSeason = true
         var enterInIseason = false
-        isSaison.forEach {
+        isSaison.mapNotNull {
             var url1 = it.attr("href")
             while (noSeason) {
                 it.select("[alt=Saison 0$i]")
-                    .forEach { // enter in the block when it match the season
+                    .mapNotNull { // enter in the block when it match the season
                         noSeason = false
                     }
                 it.select("[alt=Saison $i]")
-                    .forEach { // enter in the block when it match the season
+                    .mapNotNull { // enter in the block when it match the season
                         noSeason = false
                     }
                 i++
             }
-            i = i - 1
+            i = i - 1 // take the good number
             saison00 = i
             i = 0 // reinit i et noSeason for the next page
             noSeason = true
@@ -142,7 +129,7 @@ class VostfreeProvider : MainAPI() {
             description = meta1.select("div.slide-middle > div.slide-desc").first()
                 ?.text() // first() selectione le premier élément de la liste
 
-            val listEpisode = document.select(" select.new_player_selector > option").forEach {
+            document.select(" select.new_player_selector > option").mapNotNull {
 
                 if (it.text() != "Film") {
                     val link =
@@ -191,7 +178,7 @@ class VostfreeProvider : MainAPI() {
         } else {
             season = null
         }
-        val listEpisode = document.select(" select.new_player_selector > option").forEach {
+        document.select(" select.new_player_selector > option").mapNotNull {
 
             if (it.text() != "Film") {
                 val link =
@@ -260,11 +247,12 @@ class VostfreeProvider : MainAPI() {
         } else {
             data
         }
+        val noMovie = "1"
         val noEpisode = if (parsedInfo?.episodeNumber != null) {
             parsedInfo.episodeNumber
         } else {
-            "1"
-        } // if is not a movie then take the episode number else 1
+            noMovie
+        } // if is not a movie then take the episode number else for movie it is 1
 
         val document = app.get(url).document
         document.select("div.new_player_bottom")
@@ -286,13 +274,11 @@ class VostfreeProvider : MainAPI() {
                         ?: throw ErrorLoadingException("Player No found") //prend tous les players resultat : "player_2140" et "player_6521"
                     val playerName = it.select("div#$player")
                         .text() // prend le nom du player ex : "Uqload" et "Sibnet"
-                    //for(i in playerName.indices){
                     var codePlayload =
                         document.selectFirst("div#content_$player")?.text()
-                            .toString() // resultat : "325544" ou "https:..." peut être lorsque playerName = VIP ou Upvid DStream
-                    var playerUrl = ""
-                    playerUrl = when (playerName) {
-                        "VIP", "Upvid", "Dstream", "Streamsb", "Vudeo", "NinjaS" -> codePlayload
+                            .toString() // result : "325544" ou "https:..." 
+                    var playerUrl = when (playerName) {
+                        "VIP", "Upvid", "Dstream", "Streamsb", "Vudeo", "NinjaS" -> codePlayload // case https
                         "Uqload" -> "https://uqload.com/embed-$codePlayload.html"
                         "Mytv" -> "https://www.myvi.tv/embed/$codePlayload"
                         "Sibnet" -> "https://video.sibnet.ru/shell.php?videoid=$codePlayload"
@@ -324,95 +310,57 @@ class VostfreeProvider : MainAPI() {
                 }
 
             }
-
-
         return true
     }
 
-
-    override suspend fun getMainPage(
-        page: Int,
-        request: MainPageRequest
-    ): HomePageResponse {
-        val list = ArrayList<HomePageList>()
-        val animeDubStatus = ArrayList<String>(1)
-
-        animeDubStatus.add("/animes-vf/")
-        animeDubStatus.add("/animes-vostfr/")
-        animeDubStatus.add("/films-vf-vostfr/")
-
-
-
-
-        animeDubStatus.forEach {
-            val documentZero = app.get("$mainUrl$it").document
-            val numberOFpage = documentZero.select("div.navigation > div.pages > a").text()
-            var lastpage = if (numberOFpage != "") numberOFpage.substringAfterLast(" ").toString()
-                .toInt() else 1
-            val openPageMax = 2 // prendre uniquement les n pages
-            lastpage = if (lastpage > openPageMax) {
-                openPageMax
-            } else {
-                lastpage
+    private fun Element.toSearchResponse(): SearchResponse? {
+        val poster = select("span.image")
+        val posterUrl = mainUrl + poster.select("> img").attr("src")
+        val subdub = select("div.quality").text()
+        val genre = select("div.genre").text()
+        val title = select("div.info > div.title").text()
+        val link = select("div.play > a").attr("href")
+        if (genre == "FILM") {
+            return newMovieSearchResponse(
+                title,
+                link,
+                TvType.AnimeMovie,
+                false,
+            ) {
+                this.posterUrl = posterUrl
+                //this.quality = quality
             }
-            var categoryTitle = ""
-            for (i in 1..lastpage) {
-                var page = "/page/$i"
-                val document = app.get("$mainUrl$it$page").document
 
-                val movies = document.select("div#content > div#dle-content > div.movie-poster")
-                categoryTitle =
-                    document.select("div#left-movies-block > ul#left-movies-tabs > li").text()
-                        .replace("Animes VF", " Animes EN FRANÇAIS (page $i)")
-                        .replace("Animes VOSTFR", " Animes VOSTFR (page $i)")
-                        .replace("Films VF et VOSTFR", "FILMS EN FRANÇAIS OU EN VOSTFR (page $i)")
-                        .replace("Liste", "").replace("La liste des", "")
-                val returnList = movies.mapNotNull { article ->
-                    // map est la même chose que apmap (mais apmap est plus rapide)
-                    // ici si un élément est null, il sera automatiquement enlevé de la liste
-                    val poster = article.select("span.image")
-                    val posterUrl = mainUrl + poster.select("> img").attr("src")
-                    val subdub = article.select("div.quality").text()
-
-                    val genre = article.select("div.genre").text()
-
-                    val title = article.select("div.info > div.title").text()
-                    val link = article.select("div.play > a").attr("href")
-                    if (genre == "FILM") {
-                        newMovieSearchResponse(
-                            title,
-                            link,
-                            TvType.AnimeMovie,
-                            false,
-                        ) {
-                            this.posterUrl = posterUrl
-                            //this.quality = quality
-                        }
-
-                    } else  // a tv serie
-                    {
-                        newAnimeSearchResponse(
-                            title,
-                            link,
-                            TvType.Anime,
-                            false,
-                        ) {
-                            this.posterUrl = posterUrl
-                            if (subdub == "VF") DubStatus.Dubbed else DubStatus.Subbed
-                            //this.quality = quality
-                        }
-                    }
-
-                }
-                if (returnList.isEmpty()) throw ErrorLoadingException()
-                list.add(HomePageList(categoryTitle, returnList))
-
+        } else  // an Anime
+        {
+            return newAnimeSearchResponse(
+                title,
+                link,
+                TvType.Anime,
+                false,
+            ) {
+                this.posterUrl = posterUrl
+                if (subdub == "VF") DubStatus.Dubbed else DubStatus.Subbed
             }
         }
-        if (list.isEmpty()) throw ErrorLoadingException()
-        return HomePageResponse(
-            list
-        )
+    }
+
+    override val mainPage = mainPageOf(
+        Pair("$mainUrl/animes-vf/page/", "Animes en version français"),
+        Pair("$mainUrl/animes-vostfr/page/", "Animes sous-titrés en français"),
+        Pair("$mainUrl/films-vf-vostfr/page/", "Films en Fr et Vostfr")
+    )
+
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        val url = request.data + page
+        val document = app.get(url).document
+        val movies = document.select("div#content > div#dle-content > div.movie-poster")
+
+        val home =
+            movies.mapNotNull { article ->  // avec mapnotnull si un élément est null, il sera automatiquement enlevé de la liste
+                article.toSearchResponse()
+            }
+        return newHomePageResponse(request.name, home)
     }
 
 
