@@ -1,5 +1,6 @@
 package com.lagradost
 
+
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
@@ -27,20 +28,21 @@ class VostfreeProvider : MainAPI() {
      **/
     override suspend fun search(query: String): List<SearchResponse> {
         val link =
-            "$mainUrl/index.php?story=$query&do=search&subaction=search" // L'url pour chercher un anime de dragon sera donc: 'https://vostfree.cx/index.php?story=dragon&do=search&subaction=search'
+            "$mainUrl/index.php?do=search&subaction=search&story=$query&submit=Submit+Query" // L'url pour chercher un anime de dragon sera donc: 'https://vostfree.cx/index.php?story=dragon&do=search&subaction=search'
+        var mediaType = TvType.Anime
         val document =
-            app.get(link).document // app.get() permet de télécharger la page html avec une requete HTTP (get)
+            app.post(link).document // app.get() permet de télécharger la page html avec une requete HTTP (get)
         return document.select("div.search-result") // on séléctione tous les éléments 'enfant' du type articles
             .apmap { div -> // apmap crée une liste des éléments (ici newMovieSearchResponse et newAnimeSearchResponse)
                 val type =
-                    div?.selectFirst("div.genre")?.text()?.replace("\t", "")
-                        ?.replace("\n", "")  // replace enlève tous les '\t' et '\n' du titre
+                    div?.selectFirst("div.genre")
+                        ?.text()  // replace enlève tous les '\t' et '\n' du titre
                 val mediaPoster = mainUrl + div?.selectFirst("span.image > img")
                     ?.attr("src") // récupère le texte de l'attribut src de l'élément
                 val href = div?.selectFirst("div.info > div.title > a")?.attr("href")
                     ?: throw ErrorLoadingException("invalid link") // renvoie une erreur si il n'y a pas de lien vers le média
                 val title = div.selectFirst("> div.info > div.title > a")?.text().toString()
-
+                if (type == "OAV") mediaType = TvType.OVA
                 when (type) {
                     "FILM" -> (
                             newMovieSearchResponse( // réponse du film qui sera ajoutée à la liste apmap qui sera ensuite return
@@ -53,11 +55,11 @@ class VostfreeProvider : MainAPI() {
                                 // this.rating = rating
                             }
                             )
-                    null -> (
+                    null, "OAV" -> (
                             newAnimeSearchResponse(
                                 title,
                                 href,
-                                TvType.Anime,
+                                mediaType,
                                 false
                             ) {
                                 this.posterUrl = mediaPoster
@@ -82,6 +84,7 @@ class VostfreeProvider : MainAPI() {
         @JsonProperty("episodeNumber") val episodeNumber: String,
     )
 
+
     override suspend fun load(url: String): LoadResponse {
         val document = app.get(url).document // récupere le texte sur la page (requète http)
         // url est le lien retourné par la fonction search (la variable href) ou la fonction getMainPage
@@ -90,45 +93,25 @@ class VostfreeProvider : MainAPI() {
 
         val meta =
             document.selectFirst("div#dle-content > div.watch-top > div.image-bg > div.image-bg-content > div.slide-block ")
-        var poster: String? = ""
-        var title = ""
-
-        var description: String? = ""// first() selectione le premier élément de la liste
         val isSaison = document.select("div.new_player_series_count > a")
-        var saison00 = -1
-        var i = 0
-        var noSeason = true
         var enterInIseason = false
+        var saison00: Int?
+        saison00 = null
         isSaison.mapNotNull {
-            var url1 = it.attr("href")
-            while (noSeason) {
-                it.select("[alt=Saison 0$i]")
-                    .mapNotNull { // enter in the block when it match the season
-                        noSeason = false
-                    }
-                it.select("[alt=Saison $i]")
-                    .mapNotNull { // enter in the block when it match the season
-                        noSeason = false
-                    }
-                i++
-            }
-            i = i - 1 // take the good number
-            saison00 = i
-            i = 0 // reinit i et noSeason for the next page
-            noSeason = true
-            var document1 = app.get(url1).document // récupere le texte sur la page (requète http)
-            // url est le lien retourné par la fonction search (la variable href) ou la fonction getMainPage
-            var meta1 =
-                document1.selectFirst("div#dle-content > div.watch-top > div.image-bg > div.image-bg-content > div.slide-block ")
-            poster = mainUrl + meta1?.select(" div.slide-poster > img")
-                ?.attr("src") // récupere le texte de l'attribut 'data-src'
-            title = meta1?.select("div.slide-middle > h1")?.text()
-                ?: throw ErrorLoadingException("Invalid title")
-            title = title.replace("Saison", "").replace("saison", "").replace("SAISON", "")
-                .replace("Season", "").replace("season", "").replace("SEASON", "")
-            description = meta1.select("div.slide-middle > div.slide-desc").first()
-                ?.text() // first() selectione le premier élément de la liste
+            val url1 = it.attr("href")
 
+            if (it.text().contains("OAV")) { // enter in the block when it match the OAV
+                saison00 = 1000
+            }
+            if (it.text().contains("Saison")) { // enter in the block when it match the OAV
+                saison00 = it.text().replace("Saison", "").replace(" ", "").replace("\n", "")
+                    .replace("\t", "").toInt()
+            }
+            val document1 = app.get(url1).document // récupere le texte sur la page (requète http)
+            val meta1 =
+                document1.selectFirst("div#dle-content > div.watch-top > div.image-bg > div.image-bg-content > div.slide-block ")
+            val poster = mainUrl + meta1?.select(" div.slide-poster > img")
+                ?.attr("src") // récupere le texte de l'attribut 'data-src'
             document.select(" select.new_player_selector > option").mapNotNull {
 
                 if (it.text() != "Film") {
@@ -142,7 +125,7 @@ class VostfreeProvider : MainAPI() {
                             link,
                             episode = it.text().replace("Episode ", "").toInt(),
                             season = saison00,
-                            name = "Saison ${saison00.toString()}" + it.text(),
+                            name = "Saison $saison00" + it.text(),
                             //description= description,
                             posterUrl = poster
                         )
@@ -154,27 +137,22 @@ class VostfreeProvider : MainAPI() {
             }
             enterInIseason = true
         }
-        poster = mainUrl + meta?.select(" div.slide-poster > img")
+        val poster = mainUrl + meta?.select(" div.slide-poster > img")
             ?.attr("src") // récupere le texte de l'attribut 'data-src'
-        title = meta?.select("div.slide-middle > h1")?.text()
+        var title = meta?.select("div.slide-middle > h1")?.text()
             ?: throw ErrorLoadingException("Invalid title")
 
 
-        description = meta.select("div.slide-middle > div.slide-desc").first()
+        val description = meta.select("div.slide-middle > div.slide-desc").first()
             ?.text() // first() selectione le premier élément de la liste
-        //var saison0 = document.select("div.new_player_series_count > a")?.text()?.replace("Saison 0","")?.replace("Saison ","")?.toInt()
         var season: Int?
         if (enterInIseason) {
             val seasontext = meta.select("ul.slide-top > li:last-child > b:last-child").text()
             title = title.replace("Saison", "").replace("saison", "").replace("SAISON", "")
                 .replace("Season", "").replace("season", "").replace("SEASON", "")
-            var index = seasontext?.indexOf('0')
-            var no = seasontext
-            while (index == 0) {
-                no = seasontext?.drop(1).toString()
-                index = no?.indexOf('0')
-            }
-            season = no.toInt()
+
+            season = seasontext.toInt()
+            if (season < 1) season = 2000
         } else {
             season = null
         }
@@ -259,24 +237,24 @@ class VostfreeProvider : MainAPI() {
             .apmap { player_bottom -> // séléctione tous les players
 
                 // supprimer les zéro de 0015 pour obtenir l'episode 15
-                var index = noEpisode?.indexOf('0')
+                var index = noEpisode.indexOf('0')
                 var no = noEpisode
                 while (index == 0) {
-                    no = noEpisode?.drop(1).toString()
-                    index = no?.indexOf('0')
+                    no = noEpisode.drop(1)
+                    index = no.indexOf('0')
                 }
 
-                var cssQuery = " div#buttons_$no" // no numéro épisode
+                val cssQuery = " div#buttons_$no" // no numéro épisode
                 val buttonsNepisode = player_bottom?.select(cssQuery)
                     ?: throw ErrorLoadingException("Non player")  //séléctione tous les players pour l'episode NoEpisode
                 buttonsNepisode.select("> div").forEach {
-                    val player = it.attr("id")?.toString()
-                        ?: throw ErrorLoadingException("Player No found") //prend tous les players resultat : "player_2140" et "player_6521"
+                    val player = it.attr("id")
+                        .toString()  //prend tous les players resultat : "player_2140" et "player_6521"
                     val playerName = it.select("div#$player")
                         .text() // prend le nom du player ex : "Uqload" et "Sibnet"
-                    var codePlayload =
+                    val codePlayload =
                         document.selectFirst("div#content_$player")?.text()
-                            .toString() // result : "325544" ou "https:..." 
+                            .toString() // result : "325544" ou "https:..."
                     var playerUrl = when (playerName) {
                         "VIP", "Upvid", "Dstream", "Streamsb", "Vudeo", "NinjaS" -> codePlayload // case https
                         "Uqload" -> "https://uqload.com/embed-$codePlayload.html"
@@ -313,7 +291,7 @@ class VostfreeProvider : MainAPI() {
         return true
     }
 
-    private fun Element.toSearchResponse(): SearchResponse? {
+    private fun Element.toSearchResponse(): SearchResponse {
         val poster = select("span.image")
         val posterUrl = mainUrl + poster.select("> img").attr("src")
         val subdub = select("div.quality").text()
@@ -328,7 +306,7 @@ class VostfreeProvider : MainAPI() {
                 false,
             ) {
                 this.posterUrl = posterUrl
-                //this.quality = quality
+//this.quality = quality
             }
 
         } else  // an Anime
