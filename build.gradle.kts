@@ -84,6 +84,8 @@ subprojects {
 
         //run JS
         implementation("org.mozilla:rhino:1.7.14")
+		    // Library/extensions searching with Levenshtein distance
+        implementation ("me.xdrop:fuzzywuzzy:1.4.0")
     }
 }
 

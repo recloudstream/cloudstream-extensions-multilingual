@@ -28,15 +28,6 @@ class NekoSamaProvider : MainAPI() {
      **/
 
 
-    data class Genre(
-        @JsonProperty("0") val action: String,
-        @JsonProperty("1") val adventure: String,
-        @JsonProperty("2") val drama: String?,
-        @JsonProperty("3") val fantasy: String?,
-        @JsonProperty("4") val military: String?,
-        @JsonProperty("5") val shounen: String,
-    )
-
     private fun List<EpisodeData>.sortByQuery(query: String?): List<EpisodeData> {
         return if (query == null) {
             // Return list to base state if no query
@@ -59,6 +50,15 @@ class NekoSamaProvider : MainAPI() {
             this.sortedBy { -FuzzySearch.ratio(it.name, query) }
         }
     }
+
+    data class Genre(
+        @JsonProperty("0") val action: String,
+        @JsonProperty("1") val adventure: String,
+        @JsonProperty("2") val drama: String?,
+        @JsonProperty("3") val fantasy: String?,
+        @JsonProperty("4") val military: String?,
+        @JsonProperty("5") val shounen: String,
+    )
 
     data class EpisodeData(
         @JsonProperty("id") val id: Int?,
