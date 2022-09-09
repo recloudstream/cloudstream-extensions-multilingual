@@ -9,6 +9,14 @@ import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import org.jsoup.nodes.Element
 
 
+import com.fasterxml.jackson.annotation.JsonProperty
+import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.utils.AppUtils.toJson
+import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
+import org.jsoup.nodes.Element
+
+
 class VostfreeProvider : MainAPI() {
     // VostFreeProvider() est ajouté à la liste allProviders dans MainAPI.kt
     override var mainUrl = "https://vostfree.cx"
@@ -90,44 +98,67 @@ class VostfreeProvider : MainAPI() {
         // url est le lien retourné par la fonction search (la variable href) ou la fonction getMainPage
         var mediaType = TvType.Anime
         val episodes = ArrayList<Episode>()
-
+        val urlSaison = ArrayList<String>()
         val meta =
             document.selectFirst("div#dle-content > div.watch-top > div.image-bg > div.image-bg-content > div.slide-block ")
-        val isSaison = document.select("div.new_player_series_count > a")
-        var enterInIseason = false
-        var saison00: Int?
-        saison00 = null
-        isSaison.mapNotNull {
-            val url1 = it.attr("href")
+        val description = meta?.select("div.slide-middle > div.slide-desc")?.first()
+            ?.text() // first() selectione le premier élément de la liste
+        var title = meta?.select("div.slide-middle > h1")?.text()
+            ?: throw ErrorLoadingException("Invalid title")
+        title = title.replace("Saison", "").replace("saison", "").replace("SAISON", "")
+            .replace("Season", "").replace("season", "").replace("SEASON", "")
+        val poster = mainUrl + meta?.select(" div.slide-poster > img")
+            ?.attr("src") // récupere le texte de l'attribut 'data-src'
 
-            if (it.text().contains("OAV")) { // enter in the block when it match the OAV
-                saison00 = 1000
-            }
-            if (it.text().contains("Saison")) { // enter in the block when it match the OAV
-                saison00 = it.text().replace("Saison", "").replace(" ", "").replace("\n", "")
-                    .replace("\t", "").toInt()
-            }
-            val document1 = app.get(url1).document // récupere le texte sur la page (requète http)
-            val meta1 =
-                document1.selectFirst("div#dle-content > div.watch-top > div.image-bg > div.image-bg-content > div.slide-block ")
-            val poster = mainUrl + meta1?.select(" div.slide-poster > img")
-                ?.attr("src") // récupere le texte de l'attribut 'data-src'
-            document.select(" select.new_player_selector > option").mapNotNull {
+        urlSaison.add(url)
 
-                if (it.text() != "Film") {
+
+        var seasonNumber: Int?
+        seasonNumber = null
+        val otherSaisonFound = document.select("div.new_player_series_count > a")
+        otherSaisonFound.apmap {
+            urlSaison.add(it.attr("href"))
+        }
+
+        urlSaison.forEach {
+            val urlseason = it
+            val document =
+                app.get(urlseason).document // récupere le texte sur la page (requète http)
+
+            val meta =
+                document.selectFirst("div#dle-content > div.watch-top > div.image-bg > div.image-bg-content > div.slide-block ")
+            val poster_saison = mainUrl + meta?.select(" div.slide-poster > img")
+                ?.attr("src")
+            val seasontext = meta?.select("ul.slide-top > li:last-child > b:last-child")?.text()
+            var indication: String? = null
+
+            if (seasontext != null) {
+                seasonNumber = seasontext.toInt()
+
+                if (seasonNumber!! < 1) { // seem a an OVA has 0 as season number
+                    seasonNumber = 1000
+                    indication = "Vous regardez un OVA"
+                }
+            }
+
+            document.select(" select.new_player_selector > option").apmap {
+                val typeOftheAnime = it.text()
+
+                if (typeOftheAnime != "Film") {
+                    mediaType = TvType.Anime
                     val link =
                         EpisodeData(
-                            url1,
-                            it.text().replace("Episode ", ""),
+                            urlseason,
+                            typeOftheAnime.replace("Episode ", ""),
                         ).toJson()
                     episodes.add(
                         Episode(
                             link,
-                            episode = it.text().replace("Episode ", "").toInt(),
-                            season = saison00,
-                            name = "Saison $saison00" + it.text(),
-                            //description= description,
-                            posterUrl = poster
+                            episode = typeOftheAnime.replace("Episode ", "").toInt(),
+                            season = seasonNumber,
+                            name = typeOftheAnime,
+                            description = indication,
+                            posterUrl = poster_saison
                         )
                     )
                 } else {
@@ -135,52 +166,7 @@ class VostfreeProvider : MainAPI() {
                     mediaType = TvType.AnimeMovie
                 }
             }
-            enterInIseason = true
         }
-        val poster = mainUrl + meta?.select(" div.slide-poster > img")
-            ?.attr("src") // récupere le texte de l'attribut 'data-src'
-        var title = meta?.select("div.slide-middle > h1")?.text()
-            ?: throw ErrorLoadingException("Invalid title")
-
-
-        val description = meta.select("div.slide-middle > div.slide-desc").first()
-            ?.text() // first() selectione le premier élément de la liste
-        var season: Int?
-        if (enterInIseason) {
-            val seasontext = meta.select("ul.slide-top > li:last-child > b:last-child").text()
-            title = title.replace("Saison", "").replace("saison", "").replace("SAISON", "")
-                .replace("Season", "").replace("season", "").replace("SEASON", "")
-
-            season = seasontext.toInt()
-            if (season < 1) season = 2000
-        } else {
-            season = null
-        }
-        document.select(" select.new_player_selector > option").mapNotNull {
-
-            if (it.text() != "Film") {
-                val link =
-                    EpisodeData(
-                        url,
-                        it.text().replace("Episode ", ""),
-                    ).toJson()
-                episodes.add(
-                    Episode(
-                        link,
-                        episode = it.text().replace("Episode ", "").toInt(),
-                        season = season,
-                        name = "Saison ${season.toString()}" + it.text(),
-                        //description= description,
-                        posterUrl = poster
-
-                    )
-                )
-            } else {
-
-                mediaType = TvType.AnimeMovie
-            }
-        }
-
 
         if (mediaType == TvType.AnimeMovie) {
             return newMovieLoadResponse(
@@ -226,7 +212,7 @@ class VostfreeProvider : MainAPI() {
             data
         }
         val noMovie = "1"
-        val noEpisode = if (parsedInfo?.episodeNumber != null) {
+        val numeroEpisode = if (parsedInfo?.episodeNumber != null) {
             parsedInfo.episodeNumber
         } else {
             noMovie
@@ -237,17 +223,17 @@ class VostfreeProvider : MainAPI() {
             .apmap { player_bottom -> // séléctione tous les players
 
                 // supprimer les zéro de 0015 pour obtenir l'episode 15
-                var index = noEpisode.indexOf('0')
-                var no = noEpisode
+                var index = numeroEpisode.indexOf('0')
+                var numero = numeroEpisode
                 while (index == 0) {
-                    no = noEpisode.drop(1)
-                    index = no.indexOf('0')
+                    numero = numeroEpisode.drop(1)
+                    index = numero.indexOf('0')
                 }
 
-                val cssQuery = " div#buttons_$no" // no numéro épisode
+                val cssQuery = " div#buttons_$numero" // numero  épisode
                 val buttonsNepisode = player_bottom?.select(cssQuery)
                     ?: throw ErrorLoadingException("Non player")  //séléctione tous les players pour l'episode NoEpisode
-                buttonsNepisode.select("> div").forEach {
+                buttonsNepisode.select("> div").apmap {
                     val player = it.attr("id")
                         .toString()  //prend tous les players resultat : "player_2140" et "player_6521"
                     val playerName = it.select("div#$player")
