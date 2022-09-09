@@ -10,7 +10,7 @@ import org.jsoup.nodes.Element
 
 import me.xdrop.fuzzywuzzy.FuzzySearch
 
-class NekosamaProvider : MainAPI() {
+class NekoSamaProvider : MainAPI() {
     override var mainUrl = "https://neko-sama.fr"
     override var name = "Neko-sama"
     override val hasQuickSearch = false // recherche rapide (optionel, pas vraimet utile)
@@ -28,29 +28,6 @@ class NekosamaProvider : MainAPI() {
      **/
 
 
-    private fun List<EpisodeData>.sortByQuery(query: String?): List<EpisodeData> {
-        return if (query == null) {
-            // Return list to base state if no query
-            this.sortedBy { it.title }
-        } else {
-            this.sortedBy {
-                -FuzzySearch.ratio(
-                    it.title?.take(query.length + 6) ?: it.title,
-                    query
-                )
-            }//compare only with the (query.length + n ) first char
-        }
-    }
-
-    private fun List<SearchResponse>.sortByname(query: String?): List<SearchResponse> {
-        return if (query == null) {
-            // Return list to base state if no query
-            this.sortedBy { it.name }
-        } else {
-            this.sortedBy { -FuzzySearch.ratio(it.name, query) }
-        }
-    }
-
     data class Genre(
         @JsonProperty("0") val action: String,
         @JsonProperty("1") val adventure: String,
@@ -59,6 +36,77 @@ class NekosamaProvider : MainAPI() {
         @JsonProperty("4") val military: String?,
         @JsonProperty("5") val shounen: String,
     )
+
+    private fun EpisodeData.TitleObtainedBysortByQuery(query: String?): String? {
+
+        if (query == null) {
+            // No shorting so return the first title
+            var title = this.title
+
+            return title
+        } else {
+
+
+            var title = this.title
+            var title1 = this.title_french
+            var title2 = this.title_english
+            var title3 = this.title_romanji
+
+
+            val titles = ArrayList<String>()
+            if (title != null) {
+                titles.add(title)
+            }
+            if (title1 != null) {
+                titles.add(title1)
+            }
+            if (title2 != null) {
+                titles.add(title2)
+            }
+            if (title3 != null) {
+                titles.add(title3)
+            }
+            // Sorted by the best title matching
+            val titlesSorted = titles.sortedBy { it ->
+                -FuzzySearch.ratio(
+                    it?.take(query.length) ?: it,
+                    query
+                )
+            }
+            return titlesSorted.elementAt(0)
+
+
+            // Looking for the best title matching
+        }
+    }
+
+    private fun List<EpisodeData>.sortByQuery(query: String?): List<EpisodeData> {
+        return if (query == null) {
+            // Return list to base state if no query
+            this.sortedBy { it.title }
+        } else {
+
+            this.sortedBy {
+                val bestTitleMatching = it.TitleObtainedBysortByQuery(query)
+                -FuzzySearch.ratio(
+                    bestTitleMatching?.take(query.length) ?: bestTitleMatching,
+                    query
+                )
+
+
+            }
+        }
+    }
+
+    /** This function is done because there is two database (vf and vostfr). So it allows to sort the combine database **/
+    private fun List<SearchResponse>.sortByname(query: String?): List<SearchResponse> {
+        return if (query == null) {
+            // Return list to base state if no query
+            this.sortedBy { it.name }
+        } else {
+            this.sortedBy { -FuzzySearch.ratio(it.name, query) }
+        }
+    }
 
     data class EpisodeData(
         @JsonProperty("id") val id: Int?,
@@ -98,7 +146,9 @@ class NekosamaProvider : MainAPI() {
                     val type = it.type
                     val mediaPoster = it.url_image
                     val href = mainUrl + it.url
-                    val title = version + it.title.toString()
+                    //val bestTitleMatching = it.StringObtainedBysortByQuery(query)
+                    val bestTitleMatching = it.TitleObtainedBysortByQuery(query)
+                    val title = version + bestTitleMatching
 
                     when (type) {
                         "m0v1e", "special" -> (
@@ -112,7 +162,7 @@ class NekosamaProvider : MainAPI() {
                                     // this.rating = rating
                                 }
                                 ))
-                        null, "tv", "ova" -> (
+                        null, "tv", "ova", "" -> (
                                 ListResults.add(newAnimeSearchResponse(
                                     title,
                                     href,
@@ -125,12 +175,14 @@ class NekosamaProvider : MainAPI() {
 
                                 ))
                         else -> {
+
                             throw ErrorLoadingException("invalid media type") // le type n'est pas reconnu ==> affiche une erreur
                         }
                     }
                 } ?: throw ErrorLoadingException("ParsedData failed")
             }
-            return ListResults.sortByname(query).take(nbrresults)
+            return ListResults.sortByname(query)
+                .take(nbrresults) // Do that to short the vf and vostfr anime together
         }
         return ListResults
     }
