@@ -10,7 +10,7 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 
 class DramaidProvider : MainAPI() {
-    override var mainUrl = "https://185.224.83.103"
+    override var mainUrl = "https://dramaid.asia"
     override var name = "DramaId"
     override val hasQuickSearch = false
     override val hasMainPage = true
