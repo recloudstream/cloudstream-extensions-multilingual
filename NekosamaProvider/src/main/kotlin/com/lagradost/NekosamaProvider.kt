@@ -23,7 +23,6 @@ class NekosamaProvider : MainAPI() {
     private val resultsSearchNbr = 30 // take only n results from search function
 
 
-
     data class EpisodeData(
         @JsonProperty("id") val id: Int,
         @JsonProperty("title") val title: String?,
@@ -124,6 +123,7 @@ class NekosamaProvider : MainAPI() {
             }
         }
     }
+
     /**
     Cherche le site pour un titre spécifique
 
@@ -138,7 +138,7 @@ class NekosamaProvider : MainAPI() {
         links.add(link)
         var ListResults = ArrayList<SearchResponse>()
         if (links != null) {
-            links.forEach {
+            links.apmap {
                 val url = it.first
                 val version = it.second
                 val reponse = app.get(url).text
