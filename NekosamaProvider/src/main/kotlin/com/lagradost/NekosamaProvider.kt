@@ -18,25 +18,41 @@ class NekosamaProvider : MainAPI() {
     override var lang = "fr" // fournisseur est en francais
     override val supportedTypes =
         setOf(TvType.Anime, TvType.AnimeMovie, TvType.OVA) // animes, animesfilms
-    // liste des types: https://recloudstream.github.io/dokka/app/com.lagradost.cloudstream3/-tv-type/index.html
 
-    /**
-    Cherche le site pour un titre spécifique
+    private val nCharQuery = 5 // take the lenght of the query + nCharQuery
+    private val resultsSearchNbr = 30 // take only n results from search function
 
-    La recherche retourne une SearchResponse, qui peut être des classes suivants: AnimeSearchResponse, MovieSearchResponse, TorrentSearchResponse, TvSeriesSearchResponse
-    Chaque classes nécessite des données différentes, mais a en commun le nom, le poster et l'url
-     **/
 
+
+    data class EpisodeData(
+        @JsonProperty("id") val id: Int,
+        @JsonProperty("title") val title: String?,
+        @JsonProperty("title_english") val title_english: String?,
+        @JsonProperty("title_romanji") val title_romanji: String?,
+        @JsonProperty("title_french") val title_french: String?,
+        @JsonProperty("others") val others: String?,
+        @JsonProperty("type") val type: String?,
+        @JsonProperty("status") val status: String?,
+        @JsonProperty("popularity") val popularity: Int?,
+        @JsonProperty("url") val url: String,
+        @JsonProperty("genre") val genre: Genre?,
+        @JsonProperty("url_image") val url_image: String?,
+        @JsonProperty("score") val score: String?,
+        @JsonProperty("start_date_year") val start_date_year: String?,
+        @JsonProperty("nb_eps") val nb_eps: String?,
+
+        )
 
     data class Genre(
-        @JsonProperty("0") val action: String,
-        @JsonProperty("1") val adventure: String,
+        @JsonProperty("0") val action: String?,
+        @JsonProperty("1") val adventure: String?,
         @JsonProperty("2") val drama: String?,
         @JsonProperty("3") val fantasy: String?,
         @JsonProperty("4") val military: String?,
-        @JsonProperty("5") val shounen: String,
+        @JsonProperty("5") val shounen: String?,
     )
 
+    // Looking for the best title matching from parsed Episode data
     private fun EpisodeData.TitleObtainedBysortByQuery(query: String?): String? {
 
         if (query == null) {
@@ -69,14 +85,13 @@ class NekosamaProvider : MainAPI() {
             // Sorted by the best title matching
             val titlesSorted = titles.sortedBy { it ->
                 -FuzzySearch.ratio(
-                    it?.take(query.length) ?: it,
+                    it?.take(query.length + nCharQuery) ?: it,
                     query
                 )
             }
             return titlesSorted.elementAt(0)
 
 
-            // Looking for the best title matching
         }
     }
 
@@ -89,51 +104,38 @@ class NekosamaProvider : MainAPI() {
             this.sortedBy {
                 val bestTitleMatching = it.TitleObtainedBysortByQuery(query)
                 -FuzzySearch.ratio(
-                    bestTitleMatching?.take(query.length) ?: bestTitleMatching,
+                    bestTitleMatching?.take(query.length + nCharQuery) ?: bestTitleMatching,
                     query
                 )
-
-
             }
         }
     }
 
-    /** This function is done because there is two database (vf and vostfr). So it allows to sort the combine database **/
+    /** This function is done because there is two database (vf and vostfr). So it allows to sort the combined database **/
     private fun List<SearchResponse>.sortByname(query: String?): List<SearchResponse> {
         return if (query == null) {
             // Return list to base state if no query
             this.sortedBy { it.name }
         } else {
-            this.sortedBy { -FuzzySearch.ratio(it.name, query) }
+
+            this.sortedBy {
+                val name = it.name
+                -FuzzySearch.ratio(name.take(query.length + nCharQuery), query)
+            }
         }
     }
+    /**
+    Cherche le site pour un titre spécifique
 
-    data class EpisodeData(
-        @JsonProperty("id") val id: Int?,
-        @JsonProperty("title") val title: String?,
-        @JsonProperty("title_english") val title_english: String?,
-        @JsonProperty("title_romanji") val title_romanji: String?,
-        @JsonProperty("title_french") val title_french: String?,
-        @JsonProperty("others") val others: String?,
-        @JsonProperty("type") val type: String?,
-        @JsonProperty("status") val status: String?,
-        @JsonProperty("popularity") val popularity: Int?,
-        @JsonProperty("url") val url: String?,
-        @JsonProperty("genre") val genre: Genre?,
-        @JsonProperty("url_image") val url_image: String?,
-        @JsonProperty("score") val score: String?,
-        @JsonProperty("start_date_year") val start_date_year: String?,
-        @JsonProperty("nb_eps") val nb_eps: String?,
-
-        )
-
+    La recherche retourne une SearchResponse, qui peut être des classes suivants: AnimeSearchResponse, MovieSearchResponse, TorrentSearchResponse, TvSeriesSearchResponse
+    Chaque classes nécessite des données différentes, mais a en commun le nom, le poster et l'url
+     **/
     override suspend fun search(query: String): List<SearchResponse> {
         val link2 = Pair("$mainUrl/animes-search-vf.json", "(VF) ")
         val link = Pair("$mainUrl/animes-search-vostfr.json", "(Vostfr) ")
         val links = ArrayList<Pair<String, String>>()
         links.add(link2)
         links.add(link)
-        val nbrresults = 50 // take only n results
         var ListResults = ArrayList<SearchResponse>()
         if (links != null) {
             links.forEach {
@@ -142,11 +144,10 @@ class NekosamaProvider : MainAPI() {
                 val reponse = app.get(url).text
                 val ParsedData = tryParseJson<ArrayList<EpisodeData>>(reponse)
 
-                ParsedData?.sortByQuery(query)?.take(nbrresults)?.apmap { it ->
+                ParsedData?.sortByQuery(query)?.take(resultsSearchNbr)?.apmap { it ->
                     val type = it.type
                     val mediaPoster = it.url_image
                     val href = mainUrl + it.url
-                    //val bestTitleMatching = it.StringObtainedBysortByQuery(query)
                     val bestTitleMatching = it.TitleObtainedBysortByQuery(query)
                     val title = version + bestTitleMatching
 
@@ -159,7 +160,6 @@ class NekosamaProvider : MainAPI() {
                                     false
                                 ) {
                                     this.posterUrl = mediaPoster
-                                    // this.rating = rating
                                 }
                                 ))
                         null, "tv", "ova", "" -> (
@@ -182,7 +182,7 @@ class NekosamaProvider : MainAPI() {
                 } ?: throw ErrorLoadingException("ParsedData failed")
             }
             return ListResults.sortByname(query)
-                .take(nbrresults) // Do that to short the vf and vostfr anime together
+                .take(resultsSearchNbr) // Do that to short the vf and vostfr anime together
         }
         return ListResults
     }
@@ -196,7 +196,7 @@ class NekosamaProvider : MainAPI() {
         // url est le lien retourné par la fonction search (la variable href) ou la fonction getMainPage
 
         val episodes = ArrayList<Episode>()
-        var mediaType = TvType.AnimeMovie
+        var mediaType = TvType.Anime
         val script =
             document.select("div#main > script:first-of-type")
 
@@ -244,7 +244,7 @@ class NekosamaProvider : MainAPI() {
         val type =
             document.selectFirst("div#anime-info-list")?.text()
         if (type != null) {
-            if (type.contains("tv") || type.contains("ova")) mediaType = TvType.Anime
+            if (type.contains(" movie")) mediaType = TvType.AnimeMovie
         }
         val description = document.selectFirst("div.synopsis > p")?.text()
         val poster = document.select("div.cover > img").attr("src")
@@ -301,9 +301,9 @@ class NekosamaProvider : MainAPI() {
                     httpsify(playerUrl),
                     playerUrl,
                     subtitleCallback
-                ) { link -> // charge un extracteur d'extraire le lien direct .mp4
+                ) { link ->
                     callback.invoke(
-                        ExtractorLink( // ici je modifie le callback pour ajouter des informations, normalement ce n'est pas nécessaire
+                        ExtractorLink(
                             link.source,
                             link.name + "",
                             link.url,
@@ -358,16 +358,16 @@ class NekosamaProvider : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url: String
-        if (page == 1) {
-            url = request.data
+        url = if (page == 1) {
+            request.data
         } else {
-            url = request.data + page
+            request.data + page
         }
         val document = app.get(url).document
         val movies = document.select("div#regular-list-animes > div.anime")
 
         val home =
-            movies.mapNotNull { article ->  // avec mapnotnull si un élément est null, il sera automatiquement enlevé de la liste
+            movies.apmap { article ->  // avec mapnotnull si un élément est null, il sera automatiquement enlevé de la liste
                 article.toSearchResponse()
             }
         return newHomePageResponse(request.name, home)
