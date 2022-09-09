@@ -19,8 +19,8 @@ class NekosamaProvider : MainAPI() {
     override val supportedTypes =
         setOf(TvType.Anime, TvType.AnimeMovie, TvType.OVA) // animes, animesfilms
 
-    private val nCharQuery = 5 // take the lenght of the query + nCharQuery
-    private val resultsSearchNbr = 30 // take only n results from search function
+    private val nCharQuery = 10 // take the lenght of the query + nCharQuery
+    private val resultsSearchNbr = 50 // take only n results from search function
 
 
     data class EpisodeData(
