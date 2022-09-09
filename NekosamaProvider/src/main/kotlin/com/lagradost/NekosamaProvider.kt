@@ -10,7 +10,7 @@ import org.jsoup.nodes.Element
 
 import me.xdrop.fuzzywuzzy.FuzzySearch
 
-class NekoSamaProvider : MainAPI() {
+class NekosamaProvider : MainAPI() {
     override var mainUrl = "https://neko-sama.fr"
     override var name = "Neko-sama"
     override val hasQuickSearch = false // recherche rapide (optionel, pas vraimet utile)
