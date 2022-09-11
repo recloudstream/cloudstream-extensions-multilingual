@@ -184,7 +184,7 @@ class WiflixProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit,
     ): Boolean {
         val parsedInfo =
-            tryParseJson<VostfreeProvider.EpisodeData>(data)
+            tryParseJson<EpisodeData>(data)
         val url = if (parsedInfo?.url != null) {
             parsedInfo.url
         } else {
