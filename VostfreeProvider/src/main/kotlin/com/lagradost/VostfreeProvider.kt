@@ -15,7 +15,7 @@ import org.jsoup.nodes.Element
 class VostfreeProvider : MainAPI() {
     // VostFreeProvider() est ajouté à la liste allProviders dans MainAPI.kt
     override var mainUrl = "https://vostfree.cx"
-    override var name = "vostfree"
+    override var name = "Vostfree"
     override val hasQuickSearch = false // recherche rapide (optionel, pas vraimet utile)
     override val hasMainPage = true // page d'accueil (optionel mais encoragé)
     override var lang = "fr" // fournisseur est en francais
@@ -316,7 +316,7 @@ class VostfreeProvider : MainAPI() {
         val movies = document.select("div#content > div#dle-content > div.movie-poster")
 
         val home =
-            movies.mapNotNull { article ->  // avec mapnotnull si un élément est null, il sera automatiquement enlevé de la liste
+            movies.apmap { article ->  // avec mapnotnull si un élément est null, il sera automatiquement enlevé de la liste
                 article.toSearchResponse()
             }
         return newHomePageResponse(request.name, home)
