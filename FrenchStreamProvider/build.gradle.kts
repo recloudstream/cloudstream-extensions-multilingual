@@ -6,8 +6,8 @@ cloudstream {
     language = "fr"
     // All of these properties are optional, you can safely remove them
 
-    // description = "Lorem Ipsum"
-    // authors = listOf("Cloudburst")
+     description = "FRENCH STREAM en plus d'être un site efficace et plaisant dispose d'un contenu visuel diversifié"
+     authors = listOf("Sarlay feat Eddy")
 
     /**
      * Status int as the following:
@@ -23,5 +23,5 @@ cloudstream {
         "Movie",
     )
 
-    iconUrl = "https://www.google.com/s2/favicons?domain=french-stream.re&sz=%size%"
+    iconUrl = "https://www.google.com/s2/favicons?domain=french-stream.ac&sz=%size%"
 }

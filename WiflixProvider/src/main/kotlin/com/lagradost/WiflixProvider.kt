@@ -286,7 +286,7 @@ class WiflixProvider : MainAPI() {
                 name = title,
                 url = link,
                 apiName = title,
-                type = TvType.Movie,
+                type = TvType.TvSeries,
                 posterUrl = posterUrl,
                 quality = quality,
                 //
