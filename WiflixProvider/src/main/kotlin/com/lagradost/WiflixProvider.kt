@@ -51,7 +51,7 @@ class WiflixProvider : MainAPI() {
         @JsonProperty("episodeNumber") val episodeNumber: String,
     )
 
-    private fun Elements.takeEpisode(url: String): ArrayList<Episode> {
+    private fun Elements.takeEpisode(url: String, DuborSub:String?): ArrayList<Episode> {
 
         val episodes = ArrayList<Episode>()
         this.select("ul.eplist > li").forEach {
@@ -68,6 +68,7 @@ class WiflixProvider : MainAPI() {
             episodes.add(
                 Episode(
                     link,
+                    name = DuborSub,
                     episode = strEpisodeN.toInt(),
                 )
             )
@@ -93,17 +94,19 @@ class WiflixProvider : MainAPI() {
             document.select("img#posterimg").attr("src")
         val yearRegex = Regex("""ate de sortie\: (\d*)""")
         val year =yearRegex.find(document.text())?.groupValues?.get(1)
+        val DuborSub:String?
 
 
         val tags = document.select("[itemprop=genre] > a").apmap {it.text()} // séléctione tous les tags et les ajoutes à une liste
 
         if (episodeFrfound.text().contains("Episode")) {
             mediaType = TvType.TvSeries
-            episodes = episodeFrfound.takeEpisode(url)
+            DuborSub = "Episode en VF"
+            episodes = episodeFrfound.takeEpisode(url,DuborSub)
         } else if (episodeVostfrfound.text().contains("Episode")) {
             mediaType = TvType.TvSeries
-
-            episodes = episodeVostfrfound.takeEpisode(url)
+            DuborSub = "Episode sous-titré"
+            episodes = episodeVostfrfound.takeEpisode(url,DuborSub)
         } else {
 
             mediaType = TvType.Movie
@@ -296,7 +299,7 @@ class WiflixProvider : MainAPI() {
         Pair("$mainUrl/films-prochainement/page/", "Film Prochainement en Streaming"),
         Pair("$mainUrl/film-en-streaming/page/", "Top Films cette année"),
         Pair("$mainUrl/serie-en-streaming/page/", "Top Séries cette année"),
-		Pair("$mainUrl/saison-complete/page/", "Les saisons complètes"),
+        Pair("$mainUrl/saison-complete/page/", "Les saisons complètes"),
         Pair("$mainUrl/film-ancien/page/", "Film zahalé (ancien)")
     )
 
