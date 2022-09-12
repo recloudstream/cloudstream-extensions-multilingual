@@ -94,6 +94,9 @@ class WiflixProvider : MainAPI() {
         val yearRegex = Regex("""ate de sortie\: (\d*)""")
         val year =yearRegex.find(document.text())?.groupValues?.get(1)
 
+
+        val tags = document.select("[itemprop=genre] > a").apmap {it.text()} // séléctione tous les tags et les ajoutes à une liste
+
         if (episodeFrfound.text().contains("Episode")) {
             mediaType = TvType.TvSeries
             episodes = episodeFrfound.takeEpisode(url)
@@ -156,6 +159,7 @@ class WiflixProvider : MainAPI() {
                 this.recommendations = recommendations
                 this.year = year?.toInt()
                 this.comingSoon =comingSoon
+                this.tags = tags
             }
         } else {
             val description = document.selectFirst("span[itemprop=description]")?.text()
@@ -170,6 +174,7 @@ class WiflixProvider : MainAPI() {
                 this.recommendations = recommendations
                 this.year = year?.toInt()
                 this.comingSoon =comingSoon
+                this.tags = tags
 
             }
         }
@@ -289,9 +294,10 @@ class WiflixProvider : MainAPI() {
 
     override val mainPage = mainPageOf(
         Pair("$mainUrl/films-prochainement/page/", "Film Prochainement en Streaming"),
-        Pair("$mainUrl/film-en-streaming/page/", "Film en streaming"),
-        Pair("$mainUrl/serie-en-streaming/page/", "Serie en streaming"),
-        Pair("$mainUrl/film-ancien/page/", "Film zavira")
+        Pair("$mainUrl/film-en-streaming/page/", "Top Films cette année"),
+        Pair("$mainUrl/serie-en-streaming/page/", "Top Séries cette année"),
+		Pair("$mainUrl/saison-complete/page/", "Les saisons complètes"),
+        Pair("$mainUrl/film-ancien/page/", "Film zahalé (ancien)")
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
