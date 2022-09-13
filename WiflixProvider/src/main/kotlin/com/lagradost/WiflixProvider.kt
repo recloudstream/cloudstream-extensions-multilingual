@@ -30,7 +30,7 @@ class WiflixProvider : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         val link =
             "$mainUrl/index.php?do=search&subaction=search&story=$query&submit=Submit+Query" // search'
-        var mediaType = TvType.Anime
+        
         val document =
             app.post(link).document // app.get() permet de télécharger la page html avec une requete HTTP (get)
          val results = document.select("div#dle-content > div.clearfix")

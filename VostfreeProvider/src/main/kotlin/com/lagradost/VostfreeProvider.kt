@@ -127,7 +127,7 @@ class VostfreeProvider : MainAPI() {
             val seasontext = meta?.select("ul.slide-top > li:last-child > b:last-child")?.text()
             var indication: String? = null
 
-            if (seasontext != null) {
+            if (seasontext != null && !seasontext.contains("""([a-zA-Z])""".toRegex())) {
                 seasonNumber = seasontext.toInt()
 
                 if (seasonNumber!! < 1) { // seem a an OVA has 0 as season number

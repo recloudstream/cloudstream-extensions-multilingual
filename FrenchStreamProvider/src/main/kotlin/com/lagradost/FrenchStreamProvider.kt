@@ -17,7 +17,7 @@ class FrenchStreamProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val link =  "$mainUrl/?do=search&subaction=search&story=$query" // search'
-        var mediaType = TvType.Anime
+        
         val document =
             app.post(link).document // app.get() permet de télécharger la page html avec une requete HTTP (get)
         val results = document.select("div#dle-content > > div.short")
@@ -224,7 +224,7 @@ class FrenchStreamProvider : MainAPI() {
         val type = select("span.mli-eps").text()
         val title = select("div.short-title").text()
         val link = select("a.short-poster").attr("href").replace("wvw.","") //wvw is an issue
-        var quality = getQualityFromString("")
+        var quality: SearchQuality?
         if (qualityExtracted.contains("HDLight")) {
             quality = getQualityFromString("HD")
         } else if (qualityExtracted.contains("Bdrip")) {
