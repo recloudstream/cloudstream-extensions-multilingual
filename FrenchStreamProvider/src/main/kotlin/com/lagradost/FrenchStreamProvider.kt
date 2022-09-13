@@ -1,10 +1,13 @@
 package com.lagradost
 
+
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.extractorApis
+import okhttp3.Interceptor
 import org.jsoup.nodes.Element
+import com.lagradost.cloudstream3.network.CloudflareKiller
 
 
 class FrenchStreamProvider : MainAPI() {
@@ -14,10 +17,9 @@ class FrenchStreamProvider : MainAPI() {
     override val hasMainPage = true
     override var lang = "fr"
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
-
+    private val interceptor = CloudflareKiller()
     override suspend fun search(query: String): List<SearchResponse> {
-        val link =  "$mainUrl/?do=search&subaction=search&story=$query" // search'
-        
+        val link = "$mainUrl/?do=search&subaction=search&story=$query" // search'
         val document =
             app.post(link).document // app.get() permet de télécharger la page html avec une requete HTTP (get)
         val results = document.select("div#dle-content > > div.short")
@@ -91,7 +93,7 @@ class FrenchStreamProvider : MainAPI() {
                 )
             }
 
-           // val tagsList = tags?.text()?.replace("Genre :","")
+            // val tagsList = tags?.text()?.replace("Genre :","")
             val yearRegex = Regex("""Titre .* \/ (\d*)""")
             val year = yearRegex.find(soup.text())?.groupValues?.get(1)
             return newTvSeriesLoadResponse(
@@ -99,7 +101,8 @@ class FrenchStreamProvider : MainAPI() {
                 url,
                 TvType.TvSeries,
                 episodes,
-            ){this.posterUrl = poster
+            ) {
+                this.posterUrl = poster
                 this.plot = description
                 this.year = year?.toInt()
                 //this.rating = rating
@@ -200,14 +203,25 @@ class FrenchStreamProvider : MainAPI() {
                         }
                 movieServers
             }
-
+        val regeUpstream = Regex("""https:\\\/\\\/uptostream.com\\\/([^&]*)""")
+        val regeVido = Regex("""href\=\"https:\/\/vido\.lol\/(.*)\" target="_blank"><img""")
         servers.apmap {
             for (extractor in extractorApis) {
                 if (it.first.contains(extractor.name, ignoreCase = true)) {
-                    //                    val name = it.first
-                    //                    print("true for $name")
-                    extractor.getSafeUrl(it.second, it.second, subtitleCallback, callback)
-                    break
+                    val playerName = it.first
+                    var playerUrl = when (!playerName.isNullOrEmpty()) {
+                        playerName.contains("Uqload"), playerName.contains("UQLOAD") -> it.second
+                        playerName.contains("Uptostream"), playerName.contains("UPTOSTREAM") -> "https://uptostream.com/iframe/" + (regeUpstream.find(
+                            app.get("https" + it.second.split("https").get(1)).text // need to do the extractor
+                        )?.groupValues?.get(1)
+                            ?: "")
+                        playerName.contains("ViDO"), playerName.contains("VIDO") -> "https://vido.lol/embed-" + (regeVido.find(
+                            app.get("https" + it.second.split("https").get(1)).text
+                        )?.groupValues?.get(1)) + ".html"
+
+                        else -> ""
+                    }
+                    extractor.getSafeUrl(playerUrl, playerUrl, subtitleCallback, callback)
                 }
             }
         }
@@ -216,14 +230,13 @@ class FrenchStreamProvider : MainAPI() {
     }
 
 
-
     private fun Element.toSearchResponse(): SearchResponse {
 
         val posterUrl = fixUrl(select("a.short-poster > img").attr("src"))
         val qualityExtracted = select("span.film-ripz > a").text()
         val type = select("span.mli-eps").text()
         val title = select("div.short-title").text()
-        val link = select("a.short-poster").attr("href").replace("wvw.","") //wvw is an issue
+        val link = select("a.short-poster").attr("href").replace("wvw.", "") //wvw is an issue
         var quality: SearchQuality?
         if (qualityExtracted.contains("HDLight")) {
             quality = getQualityFromString("HD")
@@ -236,7 +249,7 @@ class FrenchStreamProvider : MainAPI() {
         } else {
             quality = null
         }
-        if (type.contains("Eps",false)) {
+        if (type.contains("Eps", false)) {
             return MovieSearchResponse(
                 name = title,
                 url = link,
@@ -288,5 +301,6 @@ class FrenchStreamProvider : MainAPI() {
     }
 
 }
+
 
 
