@@ -30,10 +30,10 @@ class WiflixProvider : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         val link =
             "$mainUrl/index.php?do=search&subaction=search&story=$query&submit=Submit+Query" // search'
-        
+
         val document =
             app.post(link).document // app.get() permet de télécharger la page html avec une requete HTTP (get)
-         val results = document.select("div#dle-content > div.clearfix")
+        val results = document.select("div#dle-content > div.clearfix")
 
         val Allresultshome =
             results.apmap { article ->  // avec mapnotnull si un élément est null, il sera automatiquement enlevé de la liste
@@ -51,7 +51,7 @@ class WiflixProvider : MainAPI() {
         @JsonProperty("episodeNumber") val episodeNumber: String,
     )
 
-    private fun Elements.takeEpisode(url: String, DuborSub:String?): ArrayList<Episode> {
+    private fun Elements.takeEpisode(url: String, DuborSub: String?): ArrayList<Episode> {
 
         val episodes = ArrayList<Episode>()
         this.select("ul.eplist > li").forEach {
@@ -93,20 +93,21 @@ class WiflixProvider : MainAPI() {
         val posterUrl =
             document.select("img#posterimg").attr("src")
         val yearRegex = Regex("""ate de sortie\: (\d*)""")
-        val year =yearRegex.find(document.text())?.groupValues?.get(1)
-        val DuborSub:String?
+        val year = yearRegex.find(document.text())?.groupValues?.get(1)
+        val DuborSub: String?
 
 
-        val tags = document.select("[itemprop=genre] > a").apmap {it.text()} // séléctione tous les tags et les ajoutes à une liste
+        val tags = document.select("[itemprop=genre] > a")
+            .apmap { it.text() } // séléctione tous les tags et les ajoutes à une liste
 
         if (episodeFrfound.text().contains("Episode")) {
             mediaType = TvType.TvSeries
             DuborSub = "Episode en VF"
-            episodes = episodeFrfound.takeEpisode(url,DuborSub)
+            episodes = episodeFrfound.takeEpisode(url, DuborSub)
         } else if (episodeVostfrfound.text().contains("Episode")) {
             mediaType = TvType.TvSeries
             DuborSub = "Episode sous-titré"
-            episodes = episodeVostfrfound.takeEpisode(url,DuborSub)
+            episodes = episodeVostfrfound.takeEpisode(url, DuborSub)
         } else {
 
             mediaType = TvType.Movie
@@ -121,18 +122,18 @@ class WiflixProvider : MainAPI() {
                 val image = element.select("a >img")?.attr("src")
                 val recUrl = element.select("a").attr("href")
                 type_rec = TvType.TvSeries
-                if(recUrl.contains("film")) type_rec = TvType.Movie
+                if (recUrl.contains("film")) type_rec = TvType.Movie
 
-                if(type_rec == TvType.TvSeries){
+                if (type_rec == TvType.TvSeries) {
                     TvSeriesSearchResponse(
-                    recTitle,
-                    recUrl,
-                    this.name,
-                    TvType.TvSeries,
-                    image?.let { fixUrl(it) },
+                        recTitle,
+                        recUrl,
+                        this.name,
+                        TvType.TvSeries,
+                        image?.let { fixUrl(it) },
 
-                )
-            }else
+                        )
+                } else
                     MovieSearchResponse(
                         recTitle,
                         recUrl,
@@ -140,7 +141,7 @@ class WiflixProvider : MainAPI() {
                         TvType.Movie,
                         image?.let { fixUrl(it) },
 
-                    )
+                        )
 
             }
 
@@ -161,7 +162,7 @@ class WiflixProvider : MainAPI() {
                 this.plot = description
                 this.recommendations = recommendations
                 this.year = year?.toInt()
-                this.comingSoon =comingSoon
+                this.comingSoon = comingSoon
                 this.tags = tags
             }
         } else {
@@ -176,7 +177,7 @@ class WiflixProvider : MainAPI() {
                 this.plot = description
                 this.recommendations = recommendations
                 this.year = year?.toInt()
-                this.comingSoon =comingSoon
+                this.comingSoon = comingSoon
                 this.tags = tags
 
             }
@@ -224,24 +225,27 @@ class WiflixProvider : MainAPI() {
         document.select("$cssCodeForPlayer").apmap { player -> // séléctione tous les players
             var playerUrl = "https" + player.attr("href").replace("(.*)https".toRegex(), "")
             if (playerUrl != "" || playerUrl != null)
-                loadExtractor(
-                    httpsify(playerUrl),
-                    playerUrl,
-                    subtitleCallback
-                ) { link ->
-                    callback.invoke(
-                        ExtractorLink( // ici je modifie le callback pour ajouter des informations, normalement ce n'est pas nécessaire
-                            link.source,
-                            link.name + "",
-                            link.url,
-                            link.referer,
-                            getQualityFromName("HD"),
-                            link.isM3u8,
-                            link.headers,
-                            link.extractorData
-                        )
-                    )
+                if (playerUrl.contains("dood")) {
+                    playerUrl = playerUrl.replace("doodstream.com", "dood.wf")
                 }
+            loadExtractor(
+                httpsify(playerUrl),
+                playerUrl,
+                subtitleCallback
+            ) { link ->
+                callback.invoke(
+                    ExtractorLink( // ici je modifie le callback pour ajouter des informations, normalement ce n'est pas nécessaire
+                        link.source,
+                        link.name + "",
+                        link.url,
+                        link.referer,
+                        getQualityFromName("HD"),
+                        link.isM3u8,
+                        link.headers,
+                        link.extractorData
+                    )
+                )
+            }
         }
 
 
