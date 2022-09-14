@@ -13,7 +13,19 @@ class VidoExtractor : ExtractorApi() {
     override val requiresReferer = true
 
     override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
-        with(app.get(url)) {
+        val methode = if (url.contains("embed")) {
+            app.get(url) // french stream
+        } else {
+            val code = url.substringAfterLast("/")
+            val data = mapOf(
+                "op" to "embed",
+                "file_code" to code,
+                "&auto" to "1"
+
+            )
+            app.post("https://vido.lol/dl", referer = url, data = data) // wiflix
+        }
+        with(methode) {
             getAndUnpack(this.text).let { unpackedText ->
                 //val quality = unpackedText.lowercase().substringAfter(" height=").substringBefore(" ").toIntOrNull()
                 srcRegex.find(unpackedText)?.groupValues?.get(1)?.let { link ->

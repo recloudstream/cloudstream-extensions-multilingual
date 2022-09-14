@@ -203,25 +203,30 @@ class FrenchStreamProvider : MainAPI() {
                         }
                 movieServers
             }
-        val regeUpstream = Regex("""https:\\\/\\\/uptostream.com\\\/([^&]*)""")
-        val regeVido = Regex("""href\=\"https:\/\/vido\.lol\/(.*)\" target="_blank"><img""")
+
         servers.apmap {
             for (extractor in extractorApis) {
-                if (it.first.contains(extractor.name, ignoreCase = true)) {
-                    val playerName = it.first
-                    var playerUrl = when (!playerName.isNullOrEmpty()) {
-                        playerName.contains("Uqload"), playerName.contains("UQLOAD") -> it.second
-                        playerName.contains("Uptostream"), playerName.contains("UPTOSTREAM") -> "https://uptostream.com/iframe/" + (regeUpstream.find(
-                            app.get("https" + it.second.split("https").get(1)).text // need to do the extractor
-                        )?.groupValues?.get(1)
-                            ?: "")
-                        playerName.contains("ViDO"), playerName.contains("VIDO") -> "https://vido.lol/embed-" + (regeVido.find(
-                            app.get("https" + it.second.split("https").get(1)).text
-                        )?.groupValues?.get(1)) + ".html"
+                var playerName = it.first
 
-                        else -> ""
+                if (playerName.contains("Stream.B")) {
+                    playerName = it.first.replace("Stream.B", "StreamSB")
+                }
+                if (playerName.contains(extractor.name, ignoreCase = true)) {
+                    val header = app.get(
+                        "https" + it.second.split("https").get(1),
+                        allowRedirects = false
+                    ).headers
+                    println(header)
+                    val urlplayer = it.second
+                    var playerUrl = when (!urlplayer.isNullOrEmpty()) {
+                        urlplayer.contains("uqload") -> it.second
+                        urlplayer.contains("opsktp.com") -> header.get("location")
+                            .toString() // case where there is redirection to opsktp
+
+                        else -> it.second
                     }
                     extractor.getSafeUrl(playerUrl, playerUrl, subtitleCallback, callback)
+                    break
                 }
             }
         }
@@ -301,6 +306,4 @@ class FrenchStreamProvider : MainAPI() {
     }
 
 }
-
-
 
