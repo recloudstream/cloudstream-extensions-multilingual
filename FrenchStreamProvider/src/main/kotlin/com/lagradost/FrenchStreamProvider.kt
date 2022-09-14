@@ -211,6 +211,9 @@ class FrenchStreamProvider : MainAPI() {
                 if (playerName.contains("Stream.B")) {
                     playerName = it.first.replace("Stream.B", "StreamSB")
                 }
+                if (it.second.contains("streamlare")) {
+                    playerName = "Streamlare"
+                }
                 if (playerName.contains(extractor.name, ignoreCase = true)) {
                     val header = app.get(
                         "https" + it.second.split("https").get(1),
@@ -219,7 +222,6 @@ class FrenchStreamProvider : MainAPI() {
                     println(header)
                     val urlplayer = it.second
                     var playerUrl = when (!urlplayer.isNullOrEmpty()) {
-                        urlplayer.contains("uqload") -> it.second
                         urlplayer.contains("opsktp.com") -> header.get("location")
                             .toString() // case where there is redirection to opsktp
 
@@ -306,4 +308,5 @@ class FrenchStreamProvider : MainAPI() {
     }
 
 }
+
 
