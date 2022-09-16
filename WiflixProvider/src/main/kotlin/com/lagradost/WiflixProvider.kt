@@ -30,16 +30,15 @@ class WiflixProvider : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         val link =
             "$mainUrl/index.php?do=search&subaction=search&story=$query&submit=Submit+Query" // search'
-
         val document =
             app.post(link).document // app.get() permet de télécharger la page html avec une requete HTTP (get)
         val results = document.select("div#dle-content > div.clearfix")
 
-        val Allresultshome =
-            results.apmap { article ->  // avec mapnotnull si un élément est null, il sera automatiquement enlevé de la liste
+        val allresultshome =
+            results.mapNotNull { article ->  // avec mapnotnull si un élément est null, il sera automatiquement enlevé de la liste
                 article.toSearchResponse()
             }
-        return Allresultshome
+        return allresultshome
     }
 
     /**
@@ -51,7 +50,7 @@ class WiflixProvider : MainAPI() {
         @JsonProperty("episodeNumber") val episodeNumber: String,
     )
 
-    private fun Elements.takeEpisode(url: String, DuborSub: String?): ArrayList<Episode> {
+    private fun Elements.takeEpisode(url: String, duborSub: String?): ArrayList<Episode> {
 
         val episodes = ArrayList<Episode>()
         this.select("ul.eplist > li").forEach {
@@ -68,7 +67,7 @@ class WiflixProvider : MainAPI() {
             episodes.add(
                 Episode(
                     link,
-                    name = DuborSub,
+                    name = duborSub,
                     episode = strEpisodeN.toInt(),
                 )
             )
@@ -94,20 +93,19 @@ class WiflixProvider : MainAPI() {
             document.select("img#posterimg").attr("src")
         val yearRegex = Regex("""ate de sortie\: (\d*)""")
         val year = yearRegex.find(document.text())?.groupValues?.get(1)
-        val DuborSub: String?
 
 
         val tags = document.select("[itemprop=genre] > a")
-            .apmap { it.text() } // séléctione tous les tags et les ajoutes à une liste
+            .map { it.text() } // séléctione tous les tags et les ajoutes à une liste
 
         if (episodeFrfound.text().contains("Episode")) {
             mediaType = TvType.TvSeries
-            DuborSub = "Episode en VF"
-            episodes = episodeFrfound.takeEpisode(url, DuborSub)
+            val duborSub = "Episode en VF"
+            episodes = episodeFrfound.takeEpisode(url, duborSub)
         } else if (episodeVostfrfound.text().contains("Episode")) {
             mediaType = TvType.TvSeries
-            DuborSub = "Episode sous-titré"
-            episodes = episodeVostfrfound.takeEpisode(url, DuborSub)
+            val duborSub = "Episode sous-titré"
+            episodes = episodeVostfrfound.takeEpisode(url, duborSub)
         } else {
 
             mediaType = TvType.Movie
@@ -161,7 +159,7 @@ class WiflixProvider : MainAPI() {
                 this.posterUrl = fixUrl(posterUrl)
                 this.plot = description
                 this.recommendations = recommendations
-                this.year = year?.toInt()
+                this.year = year?.toIntOrNull()
                 this.comingSoon = comingSoon
                 this.tags = tags
             }
@@ -176,7 +174,7 @@ class WiflixProvider : MainAPI() {
                 this.posterUrl = fixUrl(posterUrl)
                 this.plot = description
                 this.recommendations = recommendations
-                this.year = year?.toInt()
+                this.year = year?.toIntOrNull()
                 this.comingSoon = comingSoon
                 this.tags = tags
 
@@ -194,18 +192,9 @@ class WiflixProvider : MainAPI() {
     ): Boolean {
         val parsedInfo =
             tryParseJson<EpisodeData>(data)
-        val url = if (parsedInfo?.url != null) {
-            parsedInfo.url
-        } else {
-            data
-        }
-        val numeroEpisode = if (parsedInfo?.episodeNumber != null) {
-            parsedInfo.episodeNumber
-        } else {
-            null
-        }
+        val url = parsedInfo?.url ?: data
 
-        var cssCodeForPlayer = ""
+        val numeroEpisode = parsedInfo?.episodeNumber ?: null
 
         val document = app.get(url).document
         val episodeFrfound =
@@ -213,18 +202,18 @@ class WiflixProvider : MainAPI() {
         val episodeVostfrfound =
             document.select("div.blocvostfr")
 
-        if (episodeFrfound.text().contains("Episode")) {
-            cssCodeForPlayer = "div.ep$numeroEpisode" + "vf > a"
+        val cssCodeForPlayer = if (episodeFrfound.text().contains("Episode")) {
+            "div.ep$numeroEpisode" + "vf > a"
         } else if (episodeVostfrfound.text().contains("Episode")) {
-            cssCodeForPlayer = "div.ep$numeroEpisode" + "vs > a"
+            "div.ep$numeroEpisode" + "vs > a"
         } else {
-            cssCodeForPlayer = "div.linkstab > a"
+            "div.linkstab > a"
         }
 
 
         document.select("$cssCodeForPlayer").apmap { player -> // séléctione tous les players
-            var playerUrl = "https" + player.attr("href").replace("(.*)https".toRegex(), "")
-            if (playerUrl != "" || playerUrl != null)
+            var playerUrl = "https"+player.attr("href").replace("(.*)https".toRegex(), "")
+            if (!playerUrl.isNullOrBlank())
                 if (playerUrl.contains("dood")) {
                     playerUrl = playerUrl.replace("doodstream.com", "dood.wf")
                 }
@@ -255,21 +244,17 @@ class WiflixProvider : MainAPI() {
     private fun Element.toSearchResponse(): SearchResponse {
 
         val posterUrl = fixUrl(select("div.img-box > img").attr("src"))
-        val subOrdub = select("div.nbloc1-2 >span").text()
+        val qualityExtracted = select("div.nbloc1-2 >span").text()
         val type = select("div.nbloc3").text()
         val title = select("a.nowrap").text()
         val link = select("a.nowrap").attr("href")
-        var quality = getQualityFromString("")
-        if (subOrdub.contains("HDLight")) {
-            quality = getQualityFromString("HD")
-        } else if (subOrdub.contains("Bdrip")) {
-            quality = getQualityFromString("BlueRay")
-        } else if (subOrdub.contains("DVDSCR")) {
-            quality = getQualityFromString("DVD")
-        } else if (subOrdub.contains("CAM")) {
-            quality = getQualityFromString("Cam")
-        } else {
-            quality = null
+        var quality = when (!qualityExtracted.isNullOrBlank()) {
+            qualityExtracted.contains("HDLight") -> getQualityFromString("HD")
+            qualityExtracted.contains("Bdrip") -> getQualityFromString("BlueRay")
+            qualityExtracted.contains("DVD") -> getQualityFromString("DVD")
+            qualityExtracted.contains("CAM") -> getQualityFromString("Cam")
+
+            else -> null
         }
         if (type.contains("Film")) {
             return MovieSearchResponse(
@@ -313,7 +298,7 @@ class WiflixProvider : MainAPI() {
         val movies = document.select("div#dle-content > div.clearfix")
 
         val home =
-            movies.apmap { article ->  // avec mapnotnull si un élément est null, il sera automatiquement enlevé de la liste
+            movies.mapNotNull { article ->  // avec mapnotnull si un élément est null, il sera automatiquement enlevé de la liste
                 article.toSearchResponse()
             }
         return newHomePageResponse(request.name, home)

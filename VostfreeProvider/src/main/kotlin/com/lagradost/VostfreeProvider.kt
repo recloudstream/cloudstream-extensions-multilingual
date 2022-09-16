@@ -9,9 +9,6 @@ import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import org.jsoup.nodes.Element
 
 
-
-
-
 class VostfreeProvider : MainAPI() {
     // VostFreeProvider() est ajouté à la liste allProviders dans MainAPI.kt
     override var mainUrl = "https://vostfree.cx"
@@ -31,24 +28,25 @@ class VostfreeProvider : MainAPI() {
      **/
     override suspend fun search(query: String): List<SearchResponse> {
         val link =
-            "$mainUrl/index.php?do=search&subaction=search&story=$query&submit=Submit+Query" // L'url pour chercher un anime de dragon sera donc: 'https://vostfree.cx/index.php?story=dragon&do=search&subaction=search'
+            fixUrl("/index.php?do=search&subaction=search&story=$query&submit=Submit+Query") // L'url pour chercher un anime de dragon sera donc: 'https://vostfree.cx/index.php?story=dragon&do=search&subaction=search'
         var mediaType = TvType.Anime
         val document =
             app.post(link).document // app.get() permet de télécharger la page html avec une requete HTTP (get)
         return document.select("div.search-result") // on séléctione tous les éléments 'enfant' du type articles
-            .apmap { div -> // apmap crée une liste des éléments (ici newMovieSearchResponse et newAnimeSearchResponse)
+            .mapNotNull { div -> // map crée une liste des éléments (ici newMovieSearchResponse et newAnimeSearchResponse)
                 val type =
                     div?.selectFirst("div.genre")
                         ?.text()  // replace enlève tous les '\t' et '\n' du titre
-                val mediaPoster = mainUrl + div?.selectFirst("span.image > img")
-                    ?.attr("src") // récupère le texte de l'attribut src de l'élément
+                val mediaPoster =
+                    div?.selectFirst("span.image > img")?.attr("src")
+                        ?.let { fixUrl(it) } // récupère le texte de l'attribut src de l'élément
                 val href = div?.selectFirst("div.info > div.title > a")?.attr("href")
                     ?: throw ErrorLoadingException("invalid link") // renvoie une erreur si il n'y a pas de lien vers le média
                 val title = div.selectFirst("> div.info > div.title > a")?.text().toString()
                 if (type == "OAV") mediaType = TvType.OVA
                 when (type) {
                     "FILM" -> (
-                            newMovieSearchResponse( // réponse du film qui sera ajoutée à la liste apmap qui sera ensuite return
+                            newMovieSearchResponse( // réponse du film qui sera ajoutée à la liste map qui sera ensuite return
                                 title,
                                 href,
                                 TvType.AnimeMovie,
@@ -99,23 +97,24 @@ class VostfreeProvider : MainAPI() {
         val description = meta?.select("div.slide-middle > div.slide-desc")?.first()
             ?.text() // first() selectione le premier élément de la liste
         var title = meta?.select("div.slide-middle > h1")?.text()
-            ?: throw ErrorLoadingException("Invalid title")
+            ?: "Invalid title"
         title = title.replace("Saison", "").replace("saison", "").replace("SAISON", "")
             .replace("Season", "").replace("season", "").replace("SEASON", "")
-        val poster = mainUrl + meta?.select(" div.slide-poster > img")
-            ?.attr("src") // récupere le texte de l'attribut 'data-src'
+        val poster = fixUrl(
+            meta?.select(" div.slide-poster > img")
+                ?.attr("src")!!
+        )// récupere le texte de l'attribut 'data-src'
 
         urlSaison.add(url)
 
 
-        var seasonNumber: Int?
-        seasonNumber = null
+        var seasonNumber: Int? = null
         val otherSaisonFound = document.select("div.new_player_series_count > a")
-        otherSaisonFound.apmap {
+        otherSaisonFound.forEach {
             urlSaison.add(it.attr("href"))
         }
 
-        urlSaison.forEach {
+        urlSaison.apmap {it ->
             val urlseason = it
             val document =
                 app.get(urlseason).document // récupere le texte sur la page (requète http)
@@ -127,7 +126,7 @@ class VostfreeProvider : MainAPI() {
             val seasontext = meta?.select("ul.slide-top > li:last-child > b:last-child")?.text()
             var indication: String? = null
 
-            if (seasontext != null && !seasontext.contains("""([a-zA-Z])""".toRegex())) {
+            if (!seasontext.isNullOrBlank() && !seasontext.contains("""([a-zA-Z])""".toRegex())) {
                 seasonNumber = seasontext.toInt()
 
                 if (seasonNumber!! < 1) { // seem a an OVA has 0 as season number
@@ -136,7 +135,7 @@ class VostfreeProvider : MainAPI() {
                 }
             }
 
-            document.select(" select.new_player_selector > option").apmap {
+            document.select(" select.new_player_selector > option").forEach {
                 val typeOftheAnime = it.text()
 
                 if (typeOftheAnime != "Film") {
@@ -199,23 +198,16 @@ class VostfreeProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
     ): Boolean {
-        val parsedInfo =
-            tryParseJson<EpisodeData>(data)//?:throw ErrorLoadingException("Invalid url")
-        val url = if (parsedInfo?.url != null) {
-            parsedInfo.url
-        } else {
-            data
-        }
+        val parsedInfo = tryParseJson<EpisodeData>(data)
+        val url = parsedInfo?.url ?: data
+
         val noMovie = "1"
-        val numeroEpisode = if (parsedInfo?.episodeNumber != null) {
-            parsedInfo.episodeNumber
-        } else {
-            noMovie
-        } // if is not a movie then take the episode number else for movie it is 1
+        val numeroEpisode = parsedInfo?.episodeNumber
+            ?: noMovie  // if is not a movie then take the episode number else for movie it is 1
 
         val document = app.get(url).document
         document.select("div.new_player_bottom")
-            .apmap { player_bottom -> // séléctione tous les players
+            .forEach { player_bottom -> // séléctione tous les players
 
                 // supprimer les zéro de 0015 pour obtenir l'episode 15
                 var index = numeroEpisode.indexOf('0')
@@ -237,33 +229,33 @@ class VostfreeProvider : MainAPI() {
                         document.selectFirst("div#content_$player")?.text()
                             .toString() // result : "325544" ou "https:..."
                     var playerUrl = when (playerName) {
-                        "VIP", "Upvid", "Dstream", "Streamsb", "Vudeo", "NinjaS" -> codePlayload // case https
+                        "VIP", "Upvid", "Dstream", "Streamsb", "Vudeo", "NinjaS", "Upstream" -> codePlayload // case https
                         "Uqload" -> "https://uqload.com/embed-$codePlayload.html"
                         "Mytv" -> "https://www.myvi.tv/embed/$codePlayload"
                         "Sibnet" -> "https://video.sibnet.ru/shell.php?videoid=$codePlayload"
                         "Stream" -> "https://myvi.ru/player/embed/html/$codePlayload"
-                        else -> ""
+                        else -> return@apmap
                     }
 
-                    if (playerUrl != "")
-                        loadExtractor(
-                            httpsify(playerUrl),
-                            playerUrl,
-                            subtitleCallback
-                        ) { link -> // charge un extracteur d'extraire le lien direct .mp4
-                            callback.invoke(
-                                ExtractorLink( // ici je modifie le callback pour ajouter des informations, normalement ce n'est pas nécessaire
-                                    link.source,
-                                    link.name + "",
-                                    link.url,
-                                    link.referer,
-                                    getQualityFromName("HD"),
-                                    link.isM3u8,
-                                    link.headers,
-                                    link.extractorData
-                                )
+
+                    loadExtractor(
+                        httpsify(playerUrl),
+                        playerUrl,
+                        subtitleCallback
+                    ) { link -> // charge un extracteur d'extraire le lien direct .mp4
+                        callback.invoke(
+                            ExtractorLink( // ici je modifie le callback pour ajouter des informations, normalement ce n'est pas nécessaire
+                                link.source,
+                                link.name + "",
+                                link.url,
+                                link.referer,
+                                getQualityFromName("HD"),
+                                link.isM3u8,
+                                link.headers,
+                                link.extractorData
                             )
-                        }
+                        )
+                    }
                     // }
 
                 }
@@ -274,7 +266,7 @@ class VostfreeProvider : MainAPI() {
 
     private fun Element.toSearchResponse(): SearchResponse {
         val poster = select("span.image")
-        val posterUrl = mainUrl + poster.select("> img").attr("src")
+        val posterUrl = fixUrl(poster.select("> img").attr("src"))
         val subdub = select("div.quality").text()
         val genre = select("div.genre").text()
         val title = select("div.info > div.title").text()
@@ -316,7 +308,7 @@ class VostfreeProvider : MainAPI() {
         val movies = document.select("div#content > div#dle-content > div.movie-poster")
 
         val home =
-            movies.apmap { article ->  // avec mapnotnull si un élément est null, il sera automatiquement enlevé de la liste
+            movies.mapNotNull { article ->  // avec mapnotnull si un élément est null, il sera automatiquement enlevé de la liste
                 article.toSearchResponse()
             }
         return newHomePageResponse(request.name, home)

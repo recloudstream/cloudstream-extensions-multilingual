@@ -5,7 +5,6 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.extractorApis
-import okhttp3.Interceptor
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.network.CloudflareKiller
 
@@ -24,11 +23,11 @@ class FrenchStreamProvider : MainAPI() {
             app.post(link).document // app.get() permet de télécharger la page html avec une requete HTTP (get)
         val results = document.select("div#dle-content > > div.short")
 
-        val Allresultshome =
+        val allresultshome =
             results.apmap { article ->  // avec mapnotnull si un élément est null, il sera automatiquement enlevé de la liste
                 article.toSearchResponse()
             }
-        return Allresultshome
+        return allresultshome
     }
 
     override suspend fun load(url: String): LoadResponse {
@@ -53,7 +52,7 @@ class FrenchStreamProvider : MainAPI() {
                 }
             return newMovieLoadResponse(title, url, TvType.Movie, url) {
                 this.posterUrl = poster
-                this.year = year?.toInt()
+                this.year = year?.toIntOrNull()
                 this.tags = tagsList
                 this.plot = description
                 //this.rating = rating
@@ -244,18 +243,15 @@ class FrenchStreamProvider : MainAPI() {
         val type = select("span.mli-eps").text()
         val title = select("div.short-title").text()
         val link = select("a.short-poster").attr("href").replace("wvw.", "") //wvw is an issue
-        var quality: SearchQuality?
-        if (qualityExtracted.contains("HDLight")) {
-            quality = getQualityFromString("HD")
-        } else if (qualityExtracted.contains("Bdrip")) {
-            quality = getQualityFromString("BlueRay")
-        } else if (qualityExtracted.contains("DVD")) {
-            quality = getQualityFromString("DVD")
-        } else if (qualityExtracted.contains("CAM")) {
-            quality = getQualityFromString("Cam")
-        } else {
-            quality = null
+        var quality = when (!qualityExtracted.isNullOrBlank()) {
+            qualityExtracted.contains("HDLight") -> getQualityFromString("HD")
+            qualityExtracted.contains("Bdrip") -> getQualityFromString("BlueRay")
+            qualityExtracted.contains("DVD") -> getQualityFromString("DVD")
+            qualityExtracted.contains("CAM") -> getQualityFromString("Cam")
+
+            else -> null
         }
+
         if (type.contains("Eps", false)) {
             return MovieSearchResponse(
                 name = title,
@@ -301,12 +297,11 @@ class FrenchStreamProvider : MainAPI() {
         val movies = document.select("div#dle-content > div.short")
 
         val home =
-            movies.apmap { article ->  // avec mapnotnull si un élément est null, il sera automatiquement enlevé de la liste
+            movies.map { article ->  // avec mapnotnull si un élément est null, il sera automatiquement enlevé de la liste
                 article.toSearchResponse()
             }
         return newHomePageResponse(request.name, home)
     }
 
 }
-
 

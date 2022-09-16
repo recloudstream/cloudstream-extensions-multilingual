@@ -52,7 +52,7 @@ class NekosamaProvider : MainAPI() {
     )
 
     // Looking for the best title matching from parsed Episode data
-    private fun EpisodeData.TitleObtainedBysortByQuery(query: String?): String? {
+    private fun EpisodeData.titleObtainedBysortByQuery(query: String?): String? {
 
         if (query == null) {
             // No shorting so return the first title
@@ -62,29 +62,11 @@ class NekosamaProvider : MainAPI() {
         } else {
 
 
-            var title = this.title
-            var title1 = this.title_french
-            var title2 = this.title_english
-            var title3 = this.title_romanji
-
-
-            val titles = ArrayList<String>()
-            if (title != null) {
-                titles.add(title)
-            }
-            if (title1 != null) {
-                titles.add(title1)
-            }
-            if (title2 != null) {
-                titles.add(title2)
-            }
-            if (title3 != null) {
-                titles.add(title3)
-            }
+            val titles = listOf(title, title_french, title_english, title_romanji).filterNotNull()
             // Sorted by the best title matching
             val titlesSorted = titles.sortedBy { it ->
                 -FuzzySearch.ratio(
-                    it?.take(query.length + nCharQuery) ?: it,
+                    it?.take(query.length + nCharQuery),
                     query
                 )
             }
@@ -101,7 +83,7 @@ class NekosamaProvider : MainAPI() {
         } else {
 
             this.sortedBy {
-                val bestTitleMatching = it.TitleObtainedBysortByQuery(query)
+                val bestTitleMatching = it.titleObtainedBysortByQuery(query)
                 -FuzzySearch.ratio(
                     bestTitleMatching?.take(query.length + nCharQuery) ?: bestTitleMatching,
                     query
@@ -131,60 +113,57 @@ class NekosamaProvider : MainAPI() {
     Chaque classes nécessite des données différentes, mais a en commun le nom, le poster et l'url
      **/
     override suspend fun search(query: String): List<SearchResponse> {
-        val link2 = Pair("$mainUrl/animes-search-vf.json", "(VF) ")
-        val link = Pair("$mainUrl/animes-search-vostfr.json", "(Vostfr) ")
-        val links = ArrayList<Pair<String, String>>()
-        links.add(link2)
-        links.add(link)
-        var ListResults = ArrayList<SearchResponse>()
-        if (links != null) {
-            links.apmap {
-                val url = it.first
-                val version = it.second
-                val reponse = app.get(url).text
-                val ParsedData = tryParseJson<ArrayList<EpisodeData>>(reponse)
 
-                ParsedData?.sortByQuery(query)?.take(resultsSearchNbr)?.apmap { it ->
-                    val type = it.type
-                    val mediaPoster = it.url_image
-                    val href = mainUrl + it.url
-                    val bestTitleMatching = it.TitleObtainedBysortByQuery(query)
-                    val title = version + bestTitleMatching
+        var listofResults = ArrayList<SearchResponse>()
 
-                    when (type) {
-                        "m0v1e", "special" -> (
-                                ListResults.add(newMovieSearchResponse( // réponse du film qui sera ajoutée à la liste apmap qui sera ensuite return
-                                    title,
-                                    href,
-                                    TvType.AnimeMovie,
-                                    false
-                                ) {
-                                    this.posterUrl = mediaPoster
-                                }
-                                ))
-                        null, "tv", "ova", "" -> (
-                                ListResults.add(newAnimeSearchResponse(
-                                    title,
-                                    href,
-                                    TvType.Anime,
-                                    false
-                                ) {
-                                    this.posterUrl = mediaPoster
-                                }
+        listOf(
+            "$mainUrl/animes-search-vf.json" to "(VF) ",
+            "$mainUrl/animes-search-vostfr.json" to "(Vostfr) "
+        ).apmap { it ->
+            val url = it.first
+            val version = it.second
+            val reponse = app.get(url).text
+            val ParsedData = tryParseJson<ArrayList<EpisodeData>>(reponse)
 
+            ParsedData?.sortByQuery(query)?.take(resultsSearchNbr)?.forEach { it ->
+                val type = it.type
+                val mediaPoster = it.url_image
+                val href = fixUrl(it.url)
+                val bestTitleMatching = it.titleObtainedBysortByQuery(query)
+                val title = version + bestTitleMatching
 
-                                ))
-                        else -> {
+                when (type) {
+                    "m0v1e", "special" -> (
+                            listofResults.add(newMovieSearchResponse( // réponse du film qui sera ajoutée à la liste apmap qui sera ensuite return
+                                title,
+                                href,
+                                TvType.AnimeMovie,
+                                false
+                            ) {
+                                this.posterUrl = mediaPoster
+                            }
+                            ))
+                    null, "tv", "ova", "" -> (
+                            listofResults.add(newAnimeSearchResponse(
+                                title,
+                                href,
+                                TvType.Anime,
+                                false
+                            ) {
+                                this.posterUrl = mediaPoster
+                            }
 
-                            throw ErrorLoadingException("invalid media type") // le type n'est pas reconnu ==> affiche une erreur
-                        }
+                            ))
+                    else -> {
+
+                        throw ErrorLoadingException("invalid media type") // le type n'est pas reconnu ==> affiche une erreur
                     }
-                } ?: throw ErrorLoadingException("ParsedData failed")
-            }
-            return ListResults.sortByname(query)
-                .take(resultsSearchNbr) // Do that to short the vf and vostfr anime together
+                }
+            } ?: throw ErrorLoadingException("ParsedData failed")
         }
-        return ListResults
+        return listofResults.sortByname(query)
+            .take(resultsSearchNbr) // Do that to short the vf and vostfr anime together
+
     }
 
     /**
@@ -208,11 +187,11 @@ class NekosamaProvider : MainAPI() {
         var title = ""  //document.select("div.offset-md-4 >:not(small)").text()
         var dataUrl = ""
         /////////////////////////////////////
-        results.forEach { InfoEpisode ->
-            val episodeScript = InfoEpisode.groupValues[1]
+        results.forEach { infoEpisode ->
+            val episodeScript = infoEpisode.groupValues[1]
             val srcScriptEpisode =
                 Regex("""episode\"\:\"Ep\. ([0-9]*)\"""")
-            val EpisodeNum = srcScriptEpisode.find(episodeScript)?.groupValues?.get(1)?.toInt()
+            val episodeNum = srcScriptEpisode.find(episodeScript)?.groupValues?.get(1)?.toInt()
             val srcScriptTitle = Regex("""title\"\:\"([^\"]*)\"\,\"url\"\:\"\\\/anime""")
             var titleE = srcScriptTitle.find(episodeScript)?.groupValues?.get(1)
             if (titleE != null) title = titleE
@@ -233,7 +212,7 @@ class NekosamaProvider : MainAPI() {
             episodes.add(
                 Episode(
                     link_video,
-                    episode = EpisodeNum,
+                    episode = episodeNum,
                     name = title,
                     posterUrl = link_poster
 
@@ -292,11 +271,11 @@ class NekosamaProvider : MainAPI() {
 
         val results = srcAllvideolinks.findAll(script.toString())
 
-        results.forEach { InfoEpisode ->
+        results.forEach { infoEpisode ->
 
-            var playerUrl = InfoEpisode.groupValues[1]
+            var playerUrl = infoEpisode.groupValues[1]
 
-            if (playerUrl != "")
+            if (!playerUrl.isNullOrBlank())
                 loadExtractor(
                     httpsify(playerUrl),
                     playerUrl,
@@ -324,10 +303,9 @@ class NekosamaProvider : MainAPI() {
         val poster = select("div.cover > a > div.ma-lazy-wrapper")
         var posterUrl = poster.select("img:last-child").attr("src")
         if (posterUrl == "#") posterUrl = poster.select("img:last-child").attr("data-src")
-        //val subdub = select("div.quality").text()
         val type = select("div.info > p.year").text()
         val title = select("div.info > a.title > div.limit").text()
-        val link = mainUrl + select("div.cover > a").attr("href")
+        val link = fixUrl(select("div.cover > a").attr("href"))
         if (type.contains("Film")) {
             return newMovieSearchResponse(
                 title,
@@ -367,7 +345,7 @@ class NekosamaProvider : MainAPI() {
         val movies = document.select("div#regular-list-animes > div.anime")
 
         val home =
-            movies.apmap { article ->  // avec mapnotnull si un élément est null, il sera automatiquement enlevé de la liste
+            movies.mapNotNull { article ->  // avec mapnotnull si un élément est null, il sera automatiquement enlevé de la liste
                 article.toSearchResponse()
             }
         return newHomePageResponse(request.name, home)
