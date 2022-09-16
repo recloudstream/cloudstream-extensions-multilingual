@@ -186,6 +186,7 @@ class NekosamaProvider : MainAPI() {
         //////////////////////////////////////
         var title = ""  //document.select("div.offset-md-4 >:not(small)").text()
         var dataUrl = ""
+        var link_video = ""
         /////////////////////////////////////
         results.forEach { infoEpisode ->
             val episodeScript = infoEpisode.groupValues[1]
@@ -198,8 +199,8 @@ class NekosamaProvider : MainAPI() {
             val srcScriptlink =
                 Regex("""\"url\"\:\"([^\"]*)\"""") // remove\
             val link = srcScriptlink.find(episodeScript)?.groupValues?.get(1)
-            var link_video = ""
-            if (link != null) link_video = mainUrl + link.replace("\\", "")
+
+            if (link != null) link_video = fixUrl(link.replace("\\", ""))
 
             val srcScriptposter =
                 Regex("""\"url_image\"\:\"([^\"]*)\"""") // remove\
@@ -220,13 +221,16 @@ class NekosamaProvider : MainAPI() {
             )
 
         }
-        val type =
+        val infosList =
             document.selectFirst("div#anime-info-list")?.text()
-        if (type != null) {
-            if (type.contains(" movie")) mediaType = TvType.AnimeMovie
+        val isinfosList =!infosList.isNullOrBlank()
+        if (isinfosList) {
+            if (infosList!!.contains("movie")) mediaType = TvType.AnimeMovie
         }
+
         val description = document.selectFirst("div.synopsis > p")?.text()
         val poster = document.select("div.cover > img").attr("src")
+
         if (mediaType == TvType.AnimeMovie) {
             return newMovieLoadResponse(
                 title,
@@ -239,6 +243,11 @@ class NekosamaProvider : MainAPI() {
             }
         } else  // an anime
         {
+            val status = when(isinfosList){
+                infosList!!.contains("En cours") -> ShowStatus.Ongoing // En cours
+                infosList!!.contains("Terminé") -> ShowStatus.Completed
+                else -> null
+            }
             return newAnimeLoadResponse(
                 title,
                 url,
@@ -250,6 +259,7 @@ class NekosamaProvider : MainAPI() {
                     DubStatus.Dubbed,
                     episodes
                 )
+                this.showStatus=status
 
             }
         }
