@@ -4,11 +4,14 @@ package com.lagradost
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.utils.AppUtils.toJson
 
 import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import org.jsoup.nodes.Element
 
 import me.xdrop.fuzzywuzzy.FuzzySearch
+import java.util.*
+import kotlin.collections.ArrayList
 
 class NekosamaProvider : MainAPI() {
     override var mainUrl = "https://neko-sama.fr"
@@ -122,6 +125,11 @@ class NekosamaProvider : MainAPI() {
         ).apmap { it ->
             val url = it.first
             val version = it.second
+            val dubStatus = when (!version.isNullOrBlank()) {
+                version.contains("VF") -> DubStatus.Dubbed
+                version.contains("Vostfr") -> DubStatus.Subbed
+                else -> null
+            }
             val reponse = app.get(url).text
             val ParsedData = tryParseJson<ArrayList<EpisodeData>>(reponse)
 
@@ -151,6 +159,7 @@ class NekosamaProvider : MainAPI() {
                                 false
                             ) {
                                 this.posterUrl = mediaPoster
+                                this.dubStatus = EnumSet.of(dubStatus)
                             }
 
                             ))
@@ -223,7 +232,7 @@ class NekosamaProvider : MainAPI() {
         }
         val infosList =
             document.selectFirst("div#anime-info-list")?.text()
-        val isinfosList =!infosList.isNullOrBlank()
+        val isinfosList = !infosList.isNullOrBlank()
         if (isinfosList) {
             if (infosList!!.contains("movie")) mediaType = TvType.AnimeMovie
         }
@@ -243,7 +252,7 @@ class NekosamaProvider : MainAPI() {
             }
         } else  // an anime
         {
-            val status = when(isinfosList){
+            val status = when (isinfosList) {
                 infosList!!.contains("En cours") -> ShowStatus.Ongoing // En cours
                 infosList!!.contains("Terminé") -> ShowStatus.Completed
                 else -> null
@@ -259,7 +268,7 @@ class NekosamaProvider : MainAPI() {
                     DubStatus.Dubbed,
                     episodes
                 )
-                this.showStatus=status
+                this.showStatus = status
 
             }
         }
@@ -339,12 +348,70 @@ class NekosamaProvider : MainAPI() {
         }
     }
 
+    data class LastEpisodeData(
+        @JsonProperty("time") val time: String?,
+        @JsonProperty("timestamp") val timestamp: Int?,
+        @JsonProperty("episode") val episode: String?,
+        @JsonProperty("icons") val icons: String?,
+        @JsonProperty("title") val title: String?,
+        @JsonProperty("lang") val lang: String?,
+        @JsonProperty("url") val url: String?,
+        @JsonProperty("anime_url") val anime_url: String?,
+        @JsonProperty("url_image") val url_image: String?,
+        @JsonProperty("url_bg") val url_bg: String,
+    )
+
+    private fun LastEpisodeData.tomainHome(): SearchResponse {
+
+        var posterUrl = this.url_image?.replace("""\""", "")
+        val link = this.anime_url?.replace("""\""", "")?.let { fixUrl(it) }
+            ?: throw error("Error parsing")
+        val title = this.title ?: throw error("Error parsing")
+        val type = this.episode ?: ""
+        var lang = this.lang
+        val dubStatus = if (lang?.contains("vf") == true) {
+            DubStatus.Dubbed
+        } else {
+            DubStatus.Subbed
+        }
+
+        if (type.contains("Ep")) {
+            return newAnimeSearchResponse(
+                title.take(15).replace("\n", "") + "\n" + type.replace("Ep", "Episode"),
+                link,
+                TvType.Anime,
+                false,
+            ) {
+                this.posterUrl = posterUrl
+                this.dubStatus = EnumSet.of(dubStatus)
+
+            }
+
+        } else  // a movie
+        {
+            return newMovieSearchResponse(
+                title,
+                link,
+                TvType.AnimeMovie,
+                false,
+            ) {
+                this.posterUrl = posterUrl
+            }
+        }
+    }
+
     override val mainPage = mainPageOf(
+        Pair("$mainUrl", "Nouveaux épisodes"),
         Pair("$mainUrl/anime-vf/", "Animes et Films en version français"),
         Pair("$mainUrl/anime/", "Animes et Films sous-titrés en français"),
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        val categoryName = request.name
+        var cssSelector = ""
+        if (categoryName.contains("Nouveaux") && page <= 1) {
+            cssSelector = "div#main >script"//"div.js-last-episode-container > div.col-lg-3"
+        }
         val url: String
         url = if (page == 1) {
             request.data
@@ -352,14 +419,22 @@ class NekosamaProvider : MainAPI() {
             request.data + page
         }
         val document = app.get(url).document
-        val movies = document.select("div#regular-list-animes > div.anime")
 
-        val home =
-            movies.mapNotNull { article ->  // avec mapnotnull si un élément est null, il sera automatiquement enlevé de la liste
-                article.toSearchResponse()
-            }
+        val regexLastEpisode = Regex("""lastEpisodes = (.*)\;""")
+        val home = when (!categoryName.isNullOrBlank()) {
+            request.name.contains("Animes") -> document.select("div#regular-list-animes > div.anime")
+                .mapNotNull { article -> article.toSearchResponse() }
+            else ->
+                tryParseJson<ArrayList<LastEpisodeData>>(
+                    document.selectFirst(
+                        cssSelector
+                    )?.let {
+                        regexLastEpisode.find(
+                            it.toString()
+                        )?.groupValues?.get(1)
+                    }
+                )!!.map { episode -> episode.tomainHome() }
+        }
         return newHomePageResponse(request.name, home)
     }
-
-
 }
