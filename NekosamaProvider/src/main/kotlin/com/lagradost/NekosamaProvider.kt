@@ -228,11 +228,14 @@ class NekosamaProvider : MainAPI() {
             )
 
         }
+        val regexYear = Regex("""Diffusion [a-zA-Z]* (\d*)""")
         val infosList =
             document.selectFirst("div#anime-info-list")?.text()
         val isinfosList = !infosList.isNullOrBlank()
+        var year:Int?=null
         if (isinfosList) {
             if (infosList!!.contains("movie")) mediaType = TvType.AnimeMovie
+             year =regexYear.find(infosList)!!.groupValues.get(1).toInt()
         }
 
         val description = document.selectFirst("div.synopsis > p")?.text()
@@ -247,6 +250,7 @@ class NekosamaProvider : MainAPI() {
             ) { // retourne les informations du film
                 this.posterUrl = poster
                 this.plot = description
+                this.year = year
             }
         } else  // an anime
         {
@@ -267,6 +271,7 @@ class NekosamaProvider : MainAPI() {
                     episodes
                 )
                 this.showStatus = status
+                this.year = year
 
             }
         }
