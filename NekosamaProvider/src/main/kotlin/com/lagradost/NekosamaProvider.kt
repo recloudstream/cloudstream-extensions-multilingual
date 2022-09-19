@@ -122,9 +122,7 @@ class NekosamaProvider : MainAPI() {
         listOf(
             "$mainUrl/animes-search-vf.json" to "(VF) ",
             "$mainUrl/animes-search-vostfr.json" to "(Vostfr) "
-        ).apmap { it ->
-            val url = it.first
-            val version = it.second
+        ).apmap {(url, version) ->
             val dubStatus = when (!version.isNullOrBlank()) {
                 version.contains("VF") -> DubStatus.Dubbed
                 version.contains("Vostfr") -> DubStatus.Subbed

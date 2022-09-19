@@ -203,9 +203,9 @@ class WiflixProvider : MainAPI() {
             document.select("div.blocvostfr")
 
         val cssCodeForPlayer = if (episodeFrfound.text().contains("Episode")) {
-            "div.ep$numeroEpisode" + "vf > a"
+            "div.ep${numeroEpisode}vf > a"
         } else if (episodeVostfrfound.text().contains("Episode")) {
-            "div.ep$numeroEpisode" + "vs > a"
+            "div.ep${numeroEpisode}vs > a"
         } else {
             "div.linkstab > a"
         }

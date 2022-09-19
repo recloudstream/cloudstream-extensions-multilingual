@@ -28,7 +28,7 @@ class VostfreeProvider : MainAPI() {
      **/
     override suspend fun search(query: String): List<SearchResponse> {
         val link =
-            fixUrl("/index.php?do=search&subaction=search&story=$query&submit=Submit+Query") // L'url pour chercher un anime de dragon sera donc: 'https://vostfree.cx/index.php?story=dragon&do=search&subaction=search'
+            "$mainUrl/index.php?do=search&subaction=search&story=$query&submit=Submit+Query" // L'url pour chercher un anime de dragon sera donc: 'https://vostfree.cx/index.php?story=dragon&do=search&subaction=search'
         var mediaType = TvType.Anime
         val document =
             app.post(link).document // app.get() permet de télécharger la page html avec une requete HTTP (get)
@@ -114,8 +114,7 @@ class VostfreeProvider : MainAPI() {
             urlSaison.add(it.attr("href"))
         }
 
-        urlSaison.apmap {it ->
-            val urlseason = it
+        urlSaison.apmap {urlseason->
             val document =
                 app.get(urlseason).document // récupere le texte sur la page (requète http)
 

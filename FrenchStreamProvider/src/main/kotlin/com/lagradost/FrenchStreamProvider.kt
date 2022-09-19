@@ -6,7 +6,6 @@ import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.extractorApis
 import org.jsoup.nodes.Element
-import com.lagradost.cloudstream3.network.CloudflareKiller
 
 
 class FrenchStreamProvider : MainAPI() {
@@ -16,7 +15,6 @@ class FrenchStreamProvider : MainAPI() {
     override val hasMainPage = true
     override var lang = "fr"
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
-    private val interceptor = CloudflareKiller()
     override suspend fun search(query: String): List<SearchResponse> {
         val link = "$mainUrl/?do=search&subaction=search&story=$query" // search'
         val document =
@@ -218,7 +216,6 @@ class FrenchStreamProvider : MainAPI() {
                         "https" + it.second.split("https").get(1),
                         allowRedirects = false
                     ).headers
-                    println(header)
                     val urlplayer = it.second
                     var playerUrl = when (!urlplayer.isNullOrEmpty()) {
                         urlplayer.contains("opsktp.com") -> header.get("location")
@@ -304,4 +301,3 @@ class FrenchStreamProvider : MainAPI() {
     }
 
 }
-
