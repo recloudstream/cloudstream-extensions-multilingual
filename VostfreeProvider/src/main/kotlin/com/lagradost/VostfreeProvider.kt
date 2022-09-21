@@ -7,6 +7,8 @@ import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.utils.AppUtils.toJson
 import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import org.jsoup.nodes.Element
+import java.util.*
+import kotlin.collections.ArrayList
 
 
 class VostfreeProvider : MainAPI() {
@@ -43,6 +45,7 @@ class VostfreeProvider : MainAPI() {
                 val href = div?.selectFirst("div.info > div.title > a")?.attr("href")
                     ?: throw ErrorLoadingException("invalid link") // renvoie une erreur si il n'y a pas de lien vers le média
                 val title = div.selectFirst("> div.info > div.title > a")?.text().toString()
+                val version = div.selectFirst("> div.info > ul > li")?.text().toString()
                 if (type == "OAV") mediaType = TvType.OVA
                 when (type) {
                     "FILM" -> (
@@ -64,6 +67,10 @@ class VostfreeProvider : MainAPI() {
                                 false
                             ) {
                                 this.posterUrl = mediaPoster
+                                this.dubStatus =
+                                    if (version.contains("VF")) EnumSet.of(DubStatus.Dubbed) else EnumSet.of(
+                                        DubStatus.Subbed
+                                    )
                                 // this.rating = rating
                             }
 
@@ -104,6 +111,7 @@ class VostfreeProvider : MainAPI() {
             meta?.select(" div.slide-poster > img")
                 ?.attr("src")!!
         )// récupere le texte de l'attribut 'data-src'
+        var year = document.select("div.slide-info > p > b > a")?.text()?.toInt()
 
         urlSaison.add(url)
 
@@ -114,7 +122,7 @@ class VostfreeProvider : MainAPI() {
             urlSaison.add(it.attr("href"))
         }
 
-        urlSaison.apmap {urlseason->
+        urlSaison.apmap { urlseason ->
             val document =
                 app.get(urlseason).document // récupere le texte sur la page (requète http)
 
@@ -170,6 +178,7 @@ class VostfreeProvider : MainAPI() {
             ) { // retourne les informations du film
                 this.posterUrl = poster
                 this.plot = description
+                this.year = year
             }
         } else  // an anime
         {
@@ -180,6 +189,7 @@ class VostfreeProvider : MainAPI() {
             ) {
                 this.posterUrl = poster
                 this.plot = description
+                this.year = year
                 addEpisodes(
                     if (title.contains("VF")) DubStatus.Dubbed else DubStatus.Subbed,
                     episodes
@@ -290,25 +300,66 @@ class VostfreeProvider : MainAPI() {
                 false,
             ) {
                 this.posterUrl = posterUrl
-                if (subdub == "VF") DubStatus.Dubbed else DubStatus.Subbed
+                this.dubStatus =
+                    if (subdub == "VF") EnumSet.of(DubStatus.Dubbed) else EnumSet.of(DubStatus.Subbed)
             }
         }
     }
 
+    private fun Element.toSearchResponse1(): SearchResponse {
+        val poster = select("span.image")
+        val posterUrl = fixUrl(poster.select("> img").attr("src"))
+        val subdub = select("div.quality").text()
+        //val genre = select("div.info > ul.additional > li").text()
+        val title = select("div.info > div.title").text()
+        val link = select(" div.info > div.title > a").attr("href")
+
+        return newAnimeSearchResponse(
+            title,
+            link,
+            TvType.Anime,
+            false,
+        ) {
+            this.posterUrl = posterUrl
+            this.dubStatus =
+                if (subdub == "VF") EnumSet.of(DubStatus.Dubbed) else EnumSet.of(DubStatus.Subbed)
+        }
+
+    }
+
     override val mainPage = mainPageOf(
+        Pair("$mainUrl/last-episode.html/page/", "Nouveaux épisodes en Vostfr"),
+        Pair(
+            "$mainUrl/animes-vostfr-recement-ajoutees.html/page/",
+            "Animes Vostfr récemment ajoutés"
+        ),
+        Pair("$mainUrl/last-episode-vf.html/page/", "Nouveaux épisodes en français"),
+        Pair("$mainUrl/last-anime-vf.html/page/", "Animes VF récemment ajoutés"),
         Pair("$mainUrl/animes-vf/page/", "Animes en version français"),
         Pair("$mainUrl/animes-vostfr/page/", "Animes sous-titrés en français"),
         Pair("$mainUrl/films-vf-vostfr/page/", "Films en Fr et Vostfr")
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        val categoryName = request.name
+        var cssSelector = ""
+        if (categoryName.contains("récemment")) {
+            cssSelector = "div#content > div.movie-poster"
+        } else {
+            cssSelector = "div#content > div#dle-content > div.movie-poster"
+        }
         val url = request.data + page
         val document = app.get(url).document
-        val movies = document.select("div#content > div#dle-content > div.movie-poster")
 
         val home =
-            movies.mapNotNull { article ->  // avec mapnotnull si un élément est null, il sera automatiquement enlevé de la liste
-                article.toSearchResponse()
+            when (!categoryName.isNullOrBlank()) {
+                request.name.contains("Nouveaux") -> document.select("div#content > div.last-episode")
+                    .mapNotNull { article -> article.toSearchResponse1() }
+                else ->
+                    document.select(cssSelector)
+                        .mapNotNull { article ->  // avec mapnotnull si un élément est null, il sera automatiquement enlevé de la liste
+                            article.toSearchResponse()
+                        }
             }
         return newHomePageResponse(request.name, home)
     }
