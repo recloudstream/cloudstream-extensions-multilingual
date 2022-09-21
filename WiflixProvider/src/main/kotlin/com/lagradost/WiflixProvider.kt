@@ -29,7 +29,7 @@ class WiflixProvider : MainAPI() {
      **/
     override suspend fun search(query: String): List<SearchResponse> {
         val link =
-            "$mainUrl/index.php?do=search&subaction=search&story=$query&submit=Submit+Query" // search'
+            "$mainUrl/index.php?do=search&subaction=search&search_start=0&full_search=1&result_from=1&story=$query&titleonly=3&searchuser=&replyless=0&replylimit=0&searchdate=0&beforeafter=after&sortby=date&resorder=desc&showposts=0&catlist%5B%5D=0"  // search'
         val document =
             app.post(link).document // app.get() permet de télécharger la page html avec une requete HTTP (get)
         val results = document.select("div#dle-content > div.clearfix")
