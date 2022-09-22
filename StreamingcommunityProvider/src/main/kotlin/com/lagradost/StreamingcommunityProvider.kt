@@ -128,7 +128,7 @@ data class TrailerElement(
 
 class StreamingcommunityProvider : MainAPI() {
     override var lang = "it"
-    override var mainUrl = "https://streamingcommunity.blog"
+    override var mainUrl = "https://streamingcommunity.tech"
     override var name = "Streamingcommunity"
     override val hasMainPage = true
     override val hasChromecastSupport = true
