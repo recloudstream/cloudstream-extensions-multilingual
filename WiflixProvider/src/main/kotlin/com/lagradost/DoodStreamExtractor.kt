@@ -5,13 +5,10 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.getQualityFromName
 
 
-class DoodComExtractor : DoodStreamExtractor() {
-    override var mainUrl = "https://doodstream.com"
-}
 
 open class DoodStreamExtractor : ExtractorApi() {
     override var name = "DoodStream"
-    override var mainUrl = "https://dood.la"
+    override var mainUrl = "https://doodstream.com"
     override val requiresReferer = false
 
     override fun getExtractorUrl(id: String): String {

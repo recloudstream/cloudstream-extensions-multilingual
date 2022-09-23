@@ -7,15 +7,12 @@ import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.M3u8Helper
 
-class Sbspeed : StreamSBPlus() {
-    override var mainUrl = "https://sbspeed.com"
-}
 
 // This is a modified version of https://github.com/jmir1/aniyomi-extensions/blob/master/src/en/genoanime/src/eu/kanade/tachiyomi/animeextension/en/genoanime/extractors/StreamSBExtractor.kt
 // The following code is under the Apache License 2.0 https://github.com/jmir1/aniyomi-extensions/blob/master/LICENSE
-open class StreamSBPlus : ExtractorApi() {
+open class StreamSBPlusExtractor : ExtractorApi() {
     override var name = "StreamSB"
-    override var mainUrl = "https://watchsb.com"
+    override var mainUrl = "https://sbspeed.com"
     override val requiresReferer = false
 
     private val hexArray = "0123456789ABCDEF".toCharArray()
