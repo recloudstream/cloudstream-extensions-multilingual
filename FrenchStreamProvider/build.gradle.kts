@@ -7,7 +7,7 @@ cloudstream {
     // All of these properties are optional, you can safely remove them
 
      description = "FRENCH STREAM en plus d'être un site efficace et plaisant dispose d'un contenu visuel diversifié"
-     authors = listOf("Sarlay feat Eddy")
+     authors = listOf("Sarlay", "Eddy976")
 
     /**
      * Status int as the following:
