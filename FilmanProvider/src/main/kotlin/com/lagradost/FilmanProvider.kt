@@ -137,8 +137,13 @@ class FilmanProvider : MainAPI() {
 
         document?.select(".link-to-video")?.apmap { item ->
             val decoded = base64Decode(item.select("a").attr("data-iframe"))
+            val videoType = item.parent()?.select("td:nth-child(2)")?.text()
             val link = tryParseJson<LinkElement>(decoded)?.src ?: return@apmap
-            loadExtractor(link, subtitleCallback, callback)
+            loadExtractor(link, subtitleCallback) { extractedLink ->
+                run {
+                    callback(ExtractorLink(extractedLink.source, extractedLink.name + " " + videoType, extractedLink.url, extractedLink.referer, extractedLink.quality, extractedLink.isM3u8, extractedLink.headers, extractedLink.extractorData))
+                }
+            }
         }
         return true
     }
