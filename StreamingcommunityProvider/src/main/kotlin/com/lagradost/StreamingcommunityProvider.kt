@@ -183,7 +183,7 @@ class StreamingcommunityProvider: MainAPI() {
                 val lista = mutableListOf<MovieSearchResponse>()
                 val videoData = parseJson<List<VideoElement>>(films)
 
-                videoData.subList(0, 12).map { searchr ->
+                videoData.subList(0, 12).apmap { searchr ->
                     val id = searchr.id
                     val name = searchr.slug
                     val img = searchr.images[0].url
@@ -229,7 +229,7 @@ class StreamingcommunityProvider: MainAPI() {
             document.selectFirst("the-search-page")!!.attr("records-json").replace("&quot;", """"""")
 
         val searchresults = parseJson<List<VideoElement>>(films)
-        return searchresults.map { result ->
+        return searchresults.apmap { result ->
             val id = result.id
             val name = result.slug
             val img = result.images[0].url
@@ -296,7 +296,7 @@ class StreamingcommunityProvider: MainAPI() {
         val correlatidata = parseJson<List<VideoElement>>(correlatijs)
         val number : Int = if (correlatidata.size<=15) {correlatidata.size} else correlatidata.size-15
 
-        correlatidata.take(number).map { searchr ->
+        correlatidata.take(number).apmap { searchr ->
             val idcorr = searchr.id
             val name = searchr.slug
             val img = searchr.images[0].url
