@@ -21,18 +21,16 @@ class PinoyMoviePediaProvider : MainAPI() {
         val document = app.get(mainUrl).document
         val mainbody = document.getElementsByTag("body")
         // All rows will be hardcoded bc of the nature of the site
-        val rows = listOf(
+        val rows = listOfNotNull(
             Pair("Latest Movies", "featured-titles"),
             Pair("Movies", "dt-movies"),
             Pair("Digitally Restored", "genre_digitally-restored"),
             Pair("Action", "genre_action"),
             Pair("Romance", "genre_romance"),
             Pair("Comedy", "genre_comedy"),
-            Pair("Family", "genre_family")
-        ).toMutableList()
-        if (settingsForProvider.enableAdult) {
-            rows.add(Pair("Adult +18", "genre_pinay-sexy-movies"))
-        }
+            Pair("Family", "genre_family"),
+            if (settingsForProvider.enableAdult) Pair("Adult +18", "genre_pinay-sexy-movies") else null
+        )
         rows.forEach { item ->
             val title = item.first
             val inner = mainbody?.select("div#${item.second} > article")

@@ -79,7 +79,7 @@ class PinoyMoviesEsProvider : MainAPI() {
                 )
             }?.distinctBy { c -> c.url } ?: listOf()
             //Add to list of homepages
-            if (!elements.isNullOrEmpty()) {
+            if (elements.isNotEmpty()) {
                 all.add(
                     HomePageList(
                         title, elements
@@ -106,15 +106,13 @@ class PinoyMoviesEsProvider : MainAPI() {
                 all.addAll(homepage1)
             }
             //2nd rows
-            val listOfRows = listOf(
+            val listOfRows = listOfNotNull(
                 Pair("Action", "genre_action"),
                 Pair("Comedy", "genre_comedy"),
                 Pair("Romance", "genre_romance"),
-                Pair("Horror", "genre_horror")
-            ).toMutableList()
-            if (settingsForProvider.enableAdult) {
-                listOfRows.add(Pair("Rated-R", "genre_rated-r"))
-            }
+                Pair("Horror", "genre_horror"),
+                if (settingsForProvider.enableAdult) Pair("Rated-R", "genre_rated-r") else null
+            )
             val homepage2 = getRowElements(
                 mainbody = mainbody,
                 rows = listOfRows,

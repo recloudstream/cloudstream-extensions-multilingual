@@ -25,7 +25,7 @@ class PinoyMoviesHub : MainAPI() {
     ): HomePageResponse {
         val all = ArrayList<HomePageList>()
         val doc = app.get(mainUrl).document
-        val rows = mutableListOf(
+        val rows = listOfNotNull(
             Pair("Suggestion", "div.items.featured"),
             Pair("Pinoy Movies and TV", "div.items.full"),
             //Pair("Pinoy Teleserye and TV Series", "tvload"),
@@ -34,10 +34,8 @@ class PinoyMoviesHub : MainAPI() {
             Pair("Romance", "div#genre_romance"),
             Pair("Horror", "div#genre_horror"),
             Pair("Drama", "div#genre_drama"),
+            if (settingsForProvider.enableAdult) Pair("Rated-R 18+", "genre_rated-r") else null
         )
-        if (settingsForProvider.enableAdult) {
-            rows.add(Pair("Rated-R 18+", "genre_rated-r"))
-        }
         //Log.i(TAG, "Parsing page..")
         val maindoc = doc.selectFirst("div.module")
             ?.select("div.content.full_width_layout.full")
