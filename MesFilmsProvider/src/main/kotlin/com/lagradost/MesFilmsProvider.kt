@@ -30,11 +30,7 @@ class MesFilmsProvider : MainAPI() {
      **/
     override suspend fun search(query: String): List<SearchResponse> {
         val link = "$mainUrl/?s=$query"
-        // L'url pour chercher un film de james bond sera donc: 'https://mesfilms.lol/?s=james bond'
-        // le $ dans une string permet d'insérer une variable
-        val html = app.get(link).text // app.get() permet de télécharger la page html avec une requete HTTP (get)
-        // on peut utiliser également app.post()
-        val document = Jsoup.parse(html) // on convertit le html en un document
+        val document = app.get(link).document // on convertit le html en un document
         return document.select("div.search-page > div.result-item > article") // on séléctione tous les éléments 'enfant' du type articles
             .filter { article -> // on filtre la liste obtenue de tous les articles
                 val type = article?.selectFirst("> div.image > div.thumbnail > a > span")?.text()
@@ -104,9 +100,8 @@ class MesFilmsProvider : MainAPI() {
     )
 
     override suspend fun load(url: String): LoadResponse {
-        val html = app.get(url).text // récupere le texte sur la page (requète http)
         // url est le lien retourné par la fonction search (la variable href) ou la fonction getMainPage
-        val document = Jsoup.parse(html) // convertit en document
+        val document = app.get(url).document // convertit en document
 
         val meta = document.selectFirst("div.sheader")
         val poster = meta?.select("div.poster > img")?.attr("data-src") // récupere le texte de l'attribut 'data-src'
@@ -118,13 +113,14 @@ class MesFilmsProvider : MainAPI() {
 
         val description = extra.select("span.tagline").first()?.text() // first() selectione le premier élément de la liste
 
-        val ratingValue = data.select("div.dt_rating_data > div.starstruck-rating > span.dt_rating_vgs").first()?.text()
-
-        val rating = if (ratingValue == "0.0" || ratingValue.isNullOrEmpty()) { // || correspond à un 'or' en python
-            null // if empty or null, hide the rating
-        } else {
-            ratingValue
+        val rating = data.select("div.dt_rating_data > div.starstruck-rating > span.dt_rating_vgs").first()?.text()?.let {
+            if (it == "0.0" || it.isNullOrBlank()) {
+                null
+            } else {
+                it
+            }
         }
+
         val date = extra.select("span.date").first()?.text()?.takeLast(4) // prends les 4 dernier chiffres
 
         val tags = data.select("div.sgeneros > a").apmap {it.text()} // séléctione tous les tags et les ajoutes à une liste
@@ -172,8 +168,7 @@ class MesFilmsProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit,
     ): Boolean {
         val parsedInfo = tryParseJson<EpisodeData>(data)
-        val html = app.get(data).text
-        val document = Jsoup.parse(html)
+        val document = app.get(data).document
 
         document.select("ul#playeroptionsul > li:not(#player-option-trailer)").apmap { li -> // séléctione tous les players sauf celui avec l'id player-option-trailer
             // https://jsoup.org/cookbook/extracting-data/selector-syntax
@@ -216,8 +211,7 @@ class MesFilmsProvider : MainAPI() {
         page: Int,
         request : MainPageRequest
     ): HomePageResponse {
-        val html = app.get("$mainUrl/tendance/?get=movies").text
-        val document = Jsoup.parse(html)
+        val document = app.get("$mainUrl/tendance/?get=movies").document
         val movies = document.select("div.items > article.movies")
         val categoryTitle = document.select("div.content > header > h1").text().replaceFirstChar { it.uppercase() }
         val returnList = movies.mapNotNull { article ->
