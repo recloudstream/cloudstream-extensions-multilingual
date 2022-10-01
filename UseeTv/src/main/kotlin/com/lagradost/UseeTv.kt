@@ -32,7 +32,7 @@ class UseeTv : MainAPI() {
             }.mapNotNull {
                 it.toSearchResult()
             }
-            HomePageList(name, home)
+            HomePageList(name, home, true)
         }.filter { it.list.isNotEmpty() }
         return HomePageResponse(home)
 

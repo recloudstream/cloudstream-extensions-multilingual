@@ -5,11 +5,12 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
+import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.Jsoup
 import org.jsoup.select.Elements
 
 class VizjerProvider : MainAPI() {
-    override var mainUrl = "http://93.185.166.160"
+    override var mainUrl = "https://vizjer.pl"
     override var name = "Vizjer.pl"
     override var lang = "pl"
     override val hasMainPage = true
@@ -19,8 +20,10 @@ class VizjerProvider : MainAPI() {
         TvType.Movie
     )
 
+    private val interceptor = CloudflareKiller()
+
     override suspend fun getMainPage(page: Int, request : MainPageRequest): HomePageResponse {
-        val document = app.get(mainUrl).document
+        val document = app.get(mainUrl, interceptor = interceptor).document
         val lists = document.select(".item-list")
         val categories = ArrayList<HomePageList>()
         for (l in lists) {
@@ -37,7 +40,9 @@ class VizjerProvider : MainAPI() {
                     this.name,
                     TvType.Movie,
                     properUrl(poster)!!,
-                    year
+                    year,
+                    null,
+                    posterHeaders = interceptor.getCookieHeaders(mainUrl).toMap()
                 )
             }
             categories.add(HomePageList(title, items))
@@ -47,7 +52,7 @@ class VizjerProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val url = "$mainUrl/wyszukaj?phrase=$query"
-        val document = app.get(url).document
+        val document = app.get(url, interceptor = interceptor).document
         val lists = document.select("#advanced-search > div")
         val movies = lists[1].select("div:not(.clearfix)")
         val series = lists[3].select("div:not(.clearfix)")
@@ -66,10 +71,10 @@ class VizjerProvider : MainAPI() {
                         type,
                         properUrl(img)!!,
                         null,
-                        null
+                        posterHeaders = interceptor.getCookieHeaders(url).toMap()
                     )
                 } else {
-                    MovieSearchResponse(name, properUrl(href)!!, this.name, type, properUrl(img)!!, null)
+                    MovieSearchResponse(name, properUrl(href)!!, this.name, type, properUrl(img)!!, null, posterHeaders = interceptor.getCookieHeaders(url).toMap())
                 }
             }
         }
@@ -77,7 +82,7 @@ class VizjerProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val document = app.get(url).document
+        val document = app.get(url, interceptor = interceptor).document
         val documentTitle = document.select("title").text().trim()
 
         if (documentTitle.startsWith("Logowanie")) {

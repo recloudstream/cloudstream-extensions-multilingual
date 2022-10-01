@@ -47,15 +47,15 @@ class NontonAnimeIDProvider : MainAPI() {
 
         document.select("section#postbaru").forEach { block ->
             val header = block.selectFirst("h2")!!.text().trim()
-            val animes = block.select("article.animeseries").map {
+            val animes = block.select("article.animeseries").mapNotNull {
                 it.toSearchResult()
             }
             if (animes.isNotEmpty()) homePageList.add(HomePageList(header, animes))
         }
 
-        document.select("aside#sidebar_right > div:nth-child(4)").forEach { block ->
+        document.select("aside#sidebar_right > div.side").forEach { block ->
             val header = block.selectFirst("h3")!!.ownText().trim()
-            val animes = block.select("li.fullwdth").map {
+            val animes = block.select("ul li.fullwdth").mapNotNull {
                 it.toSearchResultPopular()
             }
             if (animes.isNotEmpty()) homePageList.add(HomePageList(header, animes))
@@ -91,9 +91,9 @@ class NontonAnimeIDProvider : MainAPI() {
         }
     }
 
-    private fun Element.toSearchResult(): AnimeSearchResponse {
+    private fun Element.toSearchResult(): AnimeSearchResponse? {
         val href = getProperAnimeLink(fixUrl(this.selectFirst("a")!!.attr("href")))
-        val title = this.selectFirst("h3.title")!!.text()
+        val title = this.selectFirst("h3.title")?.text() ?: return null
         val posterUrl = fixUrl(this.select("img").attr("data-src"))
 
         return newAnimeSearchResponse(title, href, TvType.Anime) {
@@ -103,9 +103,9 @@ class NontonAnimeIDProvider : MainAPI() {
 
     }
 
-    private fun Element.toSearchResultPopular(): AnimeSearchResponse {
+    private fun Element.toSearchResultPopular(): AnimeSearchResponse? {
         val href = getProperAnimeLink(fixUrl(this.selectFirst("a")!!.attr("href")))
-        val title = this.select("h4").text().trim()
+        val title = this.selectFirst("h4")?.text()?.trim() ?: return null
         val posterUrl = fixUrl(this.select("img").attr("data-src"))
 
         return newAnimeSearchResponse(title, href, TvType.Anime) {
@@ -157,7 +157,7 @@ class NontonAnimeIDProvider : MainAPI() {
         val type = getType(document.select("span.typeseries").text().trim())
         val rating = document.select("span.nilaiseries").text().trim().toIntOrNull()
         val description = document.select(".entry-content.seriesdesc > p").text().trim()
-        val trailer = document.selectFirst("iframe#traileryt")?.attr("data-src")
+        val trailer = document.selectFirst("a.trailerbutton")?.attr("href")
 
         val episodes = if (document.select("button.buttfilter").isNotEmpty()) {
             val id = document.select("input[name=series_id]").attr("value")

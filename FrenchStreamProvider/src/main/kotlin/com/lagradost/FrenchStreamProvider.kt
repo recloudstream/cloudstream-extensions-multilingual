@@ -1,54 +1,31 @@
 package com.lagradost
 
+
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.LoadResponse.Companion.addRating
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.extractorApis
+import org.jsoup.nodes.Element
 
 
 class FrenchStreamProvider : MainAPI() {
-    override var mainUrl = "https://french-stream.re"
-    override var name = "French Stream"
+    override var mainUrl = "https://french-stream.cx" //re ou ac ou city
+    override var name = "FrenchStream"
     override val hasQuickSearch = false
     override val hasMainPage = true
     override var lang = "fr"
-    override val supportedTypes = setOf(TvType.AnimeMovie, TvType.TvSeries, TvType.Movie)
-
+    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
     override suspend fun search(query: String): List<SearchResponse> {
-        val link = "$mainUrl/?do=search&subaction=search&story=$query"
-        val soup = app.post(link).document
+        val link = "$mainUrl/?do=search&subaction=search&story=$query" // search'
+        val document =
+            app.post(link).document // app.get() permet de télécharger la page html avec une requete HTTP (get)
+        val results = document.select("div#dle-content > > div.short")
 
-        return soup.select("div.short-in.nl").map { li ->
-            val href = fixUrl(li.selectFirst("a.short-poster")!!.attr("href"))
-            val poster = li.selectFirst("img")?.attr("src")
-            val title = li.selectFirst("> a.short-poster")!!.text().toString().replace(". ", "")
-            val year = li.selectFirst(".date")?.text()?.split("-")?.get(0)?.toIntOrNull()
-            if (title.contains(
-                    "saison",
-                    ignoreCase = true
-                )
-            ) {  // if saison in title ==> it's a TV serie
-                TvSeriesSearchResponse(
-                    title,
-                    href,
-                    this.name,
-                    TvType.TvSeries,
-                    poster,
-                    year,
-                    (title.split("Eps ", " ")[1]).split(" ")[0].toIntOrNull()
-                )
-            } else {  // it's a movie
-                MovieSearchResponse(
-                    title,
-                    href,
-                    this.name,
-                    TvType.Movie,
-                    poster,
-                    year,
-                )
+        val allresultshome =
+            results.apmap { article ->  // avec mapnotnull si un élément est null, il sera automatiquement enlevé de la liste
+                article.toSearchResponse()
             }
-        }
+        return allresultshome
     }
 
     override suspend fun load(url: String): LoadResponse {
@@ -58,35 +35,35 @@ class FrenchStreamProvider : MainAPI() {
         val isMovie = !title.contains("saison", ignoreCase = true)
         val description =
             soup.selectFirst("div.fdesc")!!.text().toString()
-                .split("streaming", ignoreCase = true)[1].replace(" :  ", "")
-        var poster = fixUrlNull(soup.selectFirst("div.fposter > img")?.attr("src"))
+                .split("streaming", ignoreCase = true)[1].replace(":", "")
+        var poster = soup.selectFirst("div.fposter > img")?.attr("src")
         val listEpisode = soup.select("div.elink")
+        val tags = soup.select("ul.flist-col > li").getOrNull(1)
+        //val rating = soup.select("span[id^=vote-num-id]")?.getOrNull(1)?.text()?.toInt()
 
         if (isMovie) {
-            val tags = soup.select("ul.flist-col > li").getOrNull(1)
+            val yearRegex = Regex("""ate de sortie\: (\d*)""")
+            val year = yearRegex.find(soup.text())?.groupValues?.get(1)
             val tagsList = tags?.select("a")
                 ?.mapNotNull {   // all the tags like action, thriller ...; unused variable
                     it?.text()
                 }
             return newMovieLoadResponse(title, url, TvType.Movie, url) {
                 this.posterUrl = poster
-                addRating(soup.select("div.fr-count > div").text())
-                this.year = soup.select("ul.flist-col > li").getOrNull(2)?.text()?.toIntOrNull()
+                this.year = year?.toIntOrNull()
                 this.tags = tagsList
                 this.plot = description
-                addTrailer(soup.selectFirst("div.fleft > span > a")?.attr("href"))
+                //this.rating = rating
+                addTrailer(soup.selectFirst("button#myBtn > a")?.attr("href"))
             }
         } else  // a tv serie
         {
-            //println(listEpisode)
-            //println("listeEpisode:")
+
             val episodeList = if ("<a" !in (listEpisode[0]).toString()) {  // check if VF is empty
                 listEpisode[1]  // no vf, return vostfr
             } else {
                 listEpisode[0] // no vostfr, return vf
             }
-
-            //println(url)
 
             val episodes = episodeList.select("a").map { a ->
                 val epNum = a.text().split("Episode")[1].trim().toIntOrNull()
@@ -94,9 +71,9 @@ class FrenchStreamProvider : MainAPI() {
                     val type = if ("honey" in a.attr("id")) {
                         "VF"
                     } else {
-                        "VOSTFR"
+                        "Vostfr"
                     }
-                    "Episode " + epNum?.toString() + " en " + type
+                    "Episode " + type
                 } else {
                     a.text()
                 }
@@ -112,17 +89,24 @@ class FrenchStreamProvider : MainAPI() {
                     null // episode date
                 )
             }
-            return TvSeriesLoadResponse(
+
+            // val tagsList = tags?.text()?.replace("Genre :","")
+            val yearRegex = Regex("""Titre .* \/ (\d*)""")
+            val year = yearRegex.find(soup.text())?.groupValues?.get(1)
+            return newTvSeriesLoadResponse(
                 title,
                 url,
-                this.name,
                 TvType.TvSeries,
                 episodes,
-                poster,
-                null,
-                description,
-                ShowStatus.Ongoing,
-            )
+            ) {
+                this.posterUrl = poster
+                this.plot = description
+                this.year = year?.toInt()
+                //this.rating = rating
+                //this.showStatus = ShowStatus.Ongoing
+                //this.tags = tagsList
+                addTrailer(soup.selectFirst("button#myBtn > a")?.attr("href"))
+            }
         }
     }
 
@@ -219,10 +203,27 @@ class FrenchStreamProvider : MainAPI() {
 
         servers.apmap {
             for (extractor in extractorApis) {
-                if (it.first.contains(extractor.name, ignoreCase = true)) {
-                    //                    val name = it.first
-                    //                    print("true for $name")
-                    extractor.getSafeUrl(it.second, it.second, subtitleCallback, callback)
+                var playerName = it.first
+
+                if (playerName.contains("Stream.B")) {
+                    playerName = it.first.replace("Stream.B", "StreamSB")
+                }
+                if (it.second.contains("streamlare")) {
+                    playerName = "Streamlare"
+                }
+                if (playerName.contains(extractor.name, ignoreCase = true)) {
+                    val header = app.get(
+                        "https" + it.second.split("https").get(1),
+                        allowRedirects = false
+                    ).headers
+                    val urlplayer = it.second
+                    var playerUrl = when (!urlplayer.isNullOrEmpty()) {
+                        urlplayer.contains("opsktp.com") -> header.get("location")
+                            .toString() // case where there is redirection to opsktp
+
+                        else -> it.second
+                    }
+                    extractor.getSafeUrl(playerUrl, playerUrl, subtitleCallback, callback)
                     break
                 }
             }
@@ -232,42 +233,71 @@ class FrenchStreamProvider : MainAPI() {
     }
 
 
-    override suspend fun getMainPage(page: Int, request : MainPageRequest): HomePageResponse? {
-        val document = app.get(mainUrl).document
-        val docs = document.select("div.sect")
-        val returnList = docs.mapNotNull {
-            val epList = it.selectFirst("> div.sect-c.floats.clearfix") ?: return@mapNotNull null
-            val title =
-                it.selectFirst("> div.sect-t.fx-row.icon-r > div.st-left > a.st-capt")!!.text()
-            val list = epList.select("> div.short")
-            val isMovieType = title.contains("Films")  // if truen type is Movie
-            val currentList = list.map { head ->
-                val hrefItem = head.selectFirst("> div.short-in.nl > a")
-                val href = fixUrl(hrefItem!!.attr("href"))
-                val img = hrefItem.selectFirst("> img")
-                val posterUrl = img!!.attr("src")
-                val name = img.attr("> div.short-title").toString()
-                return@map if (isMovieType) MovieSearchResponse(
-                    name,
-                    href,
-                    this.name,
-                    TvType.Movie,
-                    posterUrl,
-                    null
-                ) else TvSeriesSearchResponse(
-                    name,
-                    href,
-                    this.name,
-                    TvType.TvSeries,
-                    posterUrl,
-                    null, null
-                )
-            }
-            if (currentList.isNotEmpty()) {
-                HomePageList(title, currentList)
-            } else null
+    private fun Element.toSearchResponse(): SearchResponse {
+
+        val posterUrl = fixUrl(select("a.short-poster > img").attr("src"))
+        val qualityExtracted = select("span.film-ripz > a").text()
+        val type = select("span.mli-eps").text()
+        val title = select("div.short-title").text()
+        val link = select("a.short-poster").attr("href").replace("wvw.", "") //wvw is an issue
+        var quality = when (!qualityExtracted.isNullOrBlank()) {
+            qualityExtracted.contains("HDLight") -> getQualityFromString("HD")
+            qualityExtracted.contains("Bdrip") -> getQualityFromString("BlueRay")
+            qualityExtracted.contains("DVD") -> getQualityFromString("DVD")
+            qualityExtracted.contains("CAM") -> getQualityFromString("Cam")
+
+            else -> null
         }
-        if (returnList.isEmpty()) return null
-        return HomePageResponse(returnList)
+
+        if (type.contains("Eps", false)) {
+            return MovieSearchResponse(
+                name = title,
+                url = link,
+                apiName = title,
+                type = TvType.Movie,
+                posterUrl = posterUrl,
+                quality = quality
+
+            )
+
+
+        } else  // an Serie
+        {
+
+            return TvSeriesSearchResponse(
+                name = title,
+                url = link,
+                apiName = title,
+                type = TvType.TvSeries,
+                posterUrl = posterUrl,
+                quality = quality,
+                //
+            )
+
+        }
     }
+
+    override val mainPage = mainPageOf(
+        Pair("$mainUrl/xfsearch/version-film/page/", "Derniers films"),
+        Pair("$mainUrl/xfsearch/version-serie/page/", "Derniers séries"),
+        Pair("$mainUrl/film/arts-martiaux/page/", "Films za m'ringué (Arts martiaux)"),
+        Pair("$mainUrl/film/action/page/", "Films Actions"),
+        Pair("$mainUrl/film/romance/page/", "Films za malomo (Romance)"),
+        Pair("$mainUrl/serie/aventure-serie/page/", "Série aventure"),
+        Pair("$mainUrl/film/documentaire/page/", "Documentaire")
+
+    )
+
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        val url = request.data + page
+        val document = app.get(url).document
+        val movies = document.select("div#dle-content > div.short")
+
+        val home =
+            movies.map { article ->  // avec mapnotnull si un élément est null, il sera automatiquement enlevé de la liste
+                article.toSearchResponse()
+            }
+        return newHomePageResponse(request.name, home)
+    }
+
 }
