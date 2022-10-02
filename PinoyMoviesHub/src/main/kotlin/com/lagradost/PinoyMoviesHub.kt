@@ -3,7 +3,6 @@ package com.lagradost
 import android.util.Log
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.utils.AppUtils
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
@@ -23,7 +22,6 @@ class PinoyMoviesHub : MainAPI() {
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
-        val all = ArrayList<HomePageList>()
         val doc = app.get(mainUrl).document
         val rows = listOfNotNull(
             Pair("Suggestion", "div.items.featured"),
@@ -40,24 +38,20 @@ class PinoyMoviesHub : MainAPI() {
         val maindoc = doc.selectFirst("div.module")
             ?.select("div.content.full_width_layout.full")
 
-        rows.forEach { pair ->
+        val all = rows.mapNotNull { pair ->
             // Fetch row title
             val title = pair.first
             // Fetch list of items and map
             //Log.i(TAG, "Title => $title")
-            maindoc?.select(pair.second)?.let { inner ->
-                //Log.i(TAG, "inner => $inner")
-                val results = inner.select("article").getResults(this.name)
-                if (results.isNotEmpty()) {
-                    all.add(
-                        HomePageList(
-                            name = title,
-                            list = results,
-                            isHorizontalImages = false
-                        )
-                    )
-                }
+            val results = maindoc?.select(pair.second)?.select("article").getResults(this.name)
+            if (results.isEmpty()) {
+                return@mapNotNull null
             }
+            HomePageList(
+                name = title,
+                list = results,
+                isHorizontalImages = false
+            )
         }
         return HomePageResponse(all)
     }
@@ -128,43 +122,37 @@ class PinoyMoviesHub : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
 
-        try {
-            //Log.i(TAG, "Loading ajax request..")
-            val requestLink = "${mainUrl}/wp-admin/admin-ajax.php"
-            val action = "doo_player_ajax"
-            val nume = "1"
-            val type = "movie"
-            val doc = app.post(
-                url = requestLink,
-                referer = mainUrl,
-                headers = mapOf(
-                    Pair("User-Agent", USER_AGENT),
-                    Pair("Sec-Fetch-Mode", "cors")
-                ),
-                data = mapOf(
-                    Pair("action", action),
-                    Pair("post", data),
-                    Pair("nume", nume),
-                    Pair("type", type)
-                )
+        //Log.i(TAG, "Loading ajax request..")
+        val requestLink = "${mainUrl}/wp-admin/admin-ajax.php"
+        val action = "doo_player_ajax"
+        val nume = "1"
+        val type = "movie"
+        val doc = app.post(
+            url = requestLink,
+            referer = mainUrl,
+            headers = mapOf(
+                Pair("User-Agent", USER_AGENT),
+                Pair("Sec-Fetch-Mode", "cors")
+            ),
+            data = mapOf(
+                Pair("action", action),
+                Pair("post", data),
+                Pair("nume", nume),
+                Pair("type", type)
             )
-            //Log.i(TAG, "Response (${doc.code}) => ${doc.text}")
-            AppUtils.tryParseJson<Response?>(doc.text)?.let {
-                val streamLink = it.embed_url ?: ""
-                //Log.i(TAG, "Response (streamLink) => ${streamLink}")
-                if (streamLink.isNotBlank()) {
-                    loadExtractor(
-                        url = streamLink,
-                        referer = mainUrl,
-                        callback = callback,
-                        subtitleCallback = subtitleCallback
-                    )
-                }
+        )
+        //Log.i(TAG, "Response (${doc.code}) => ${doc.text}")
+        AppUtils.tryParseJson<Response?>(doc.text)?.let {
+            val streamLink = it.embed_url ?: ""
+            //Log.i(TAG, "Response (streamLink) => ${streamLink}")
+            if (streamLink.isNotBlank()) {
+                loadExtractor(
+                    url = streamLink,
+                    referer = mainUrl,
+                    callback = callback,
+                    subtitleCallback = subtitleCallback
+                )
             }
-        } catch (e: Exception) {
-            //Log.i(TAG, "Error => $e")
-            logError(e)
-            return false
         }
         return true
     }

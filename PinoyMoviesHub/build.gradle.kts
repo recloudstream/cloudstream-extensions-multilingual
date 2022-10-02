@@ -23,5 +23,5 @@ cloudstream {
         "AsianDrama",
     )
 
-    iconUrl = "https://www.google.com/s2/favicons?domain=pinoymovieshub.ph&sz=%size%"
+    iconUrl = "https://www.google.com/s2/favicons?domain=www.pinoymovieshub.ph&sz=%size%"
 }
