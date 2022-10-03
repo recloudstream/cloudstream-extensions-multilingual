@@ -21,6 +21,7 @@ class AnimeWorldProvider : MainAPI() {
     override var name = "AnimeWorld"
     override var lang = "it"
     override val hasMainPage = true
+    override val hasQuickSearch = true
 
     override val supportedTypes = setOf(
         TvType.Anime,
@@ -30,7 +31,7 @@ class AnimeWorldProvider : MainAPI() {
 
     companion object {
         private var cookies = emptyMap<String, String>()
-
+        private lateinit var token : String
         // Disabled authentication as site did
         private suspend fun request(url: String): NiceResponse {
 //            if (cookies.isEmpty()) {
@@ -154,6 +155,38 @@ class AnimeWorldProvider : MainAPI() {
         return HomePageResponse(list)
     }
 
+    data class searchJson(
+        @JsonProperty("animes") val animes: List<animejson>
+    )
+    data class animejson(
+        @JsonProperty("name") val name: String,
+        @JsonProperty("image") val image: String,
+        @JsonProperty("link") val link: String,
+        @JsonProperty("animeTypeName") val type: String,
+        @JsonProperty("language") val language: String,
+        @JsonProperty("jtitle") val otherTitle: String
+    )
+
+    override suspend fun quickSearch(query: String): List<SearchResponse>? {
+        val document = app.post("https://www.animeworld.tv/api/search/v2?keyword=${query}", referer = mainUrl, cookies = cookies, headers = mapOf("csrf-token" to token)).text
+
+        return tryParseJson<searchJson>(document)?.animes?.map { anime->
+            val type = when (anime.type) {
+                "Movie" -> TvType.AnimeMovie
+                "OVA" -> TvType.OVA
+                else -> TvType.Anime
+            }
+            val dub = when (anime.language) {
+                "it" -> true
+                else -> false
+            }
+            newAnimeSearchResponse(anime.name, anime.link, type) {
+                addDubStatus(dub)
+                this.otherName = anime.otherTitle
+                this.posterUrl = anime.image
+            }
+        }
+    }
     override suspend fun search(query: String): List<SearchResponse> {
         val document = request("$mainUrl/search?keyword=$query").document
         return document.select(".film-list > .item").map {
