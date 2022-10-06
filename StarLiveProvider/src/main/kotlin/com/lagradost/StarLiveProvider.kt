@@ -36,7 +36,7 @@ class StarLiveProvider : MainAPI() {
         val sections = document.select("div.panel")
         if (sections.isEmpty()) throw ErrorLoadingException()
 
-        return HomePageResponse(sections.map { sport ->
+        return HomePageResponse(sections.mapNotNull { sport ->
             val dayMatch = sport.previousElementSiblings().toList().first { it.`is`("h3") }.text()
             val categoryName = sport.selectFirst("h4")?.text() ?: "Other"
 
@@ -53,7 +53,7 @@ class StarLiveProvider : MainAPI() {
                                 else { matchs.key }
 
                 val href = matchs.value.map { match ->
-                    val linkUrl = fixUrl(match.selectFirst("a")?.attr("href") ?: "")
+                    val linkUrl = fixUrl(match.selectFirst("a")?.attr("href") ?: return@mapNotNull null)
                     val lang = match.attr("class")
                     LinkParser(linkUrl, lang, matchName)
                 }
@@ -88,7 +88,7 @@ class StarLiveProvider : MainAPI() {
         return LiveStreamLoadResponse(
             dataUrl = url,
             url = matchdata?.linkData?.firstOrNull()?.link ?: mainUrl,
-            name = matchdata?.linkData?.firstOrNull()?.name ?: mainUrl,
+            name = matchdata?.linkData?.firstOrNull()?.name ?: "No name",
             posterUrl = poster,
             plot = matchstart,
             apiName = this@StarLiveProvider.name
@@ -103,7 +103,7 @@ class StarLiveProvider : MainAPI() {
 
         val referrerLink = if (linktoStream.contains("starlive")) {
             app.get(linktoStream, referer = data.link).document.selectFirst("iframe")?.attr("src")
-                ?: ""
+                ?: return
         } else {
             linktoStream
         }
