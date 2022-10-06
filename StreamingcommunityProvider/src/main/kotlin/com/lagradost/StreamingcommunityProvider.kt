@@ -431,7 +431,7 @@ class StreamingcommunityProvider : MainAPI() {
         val token = tre.replace("=", "").replace("+", "-").replace("/", "_")
 
 
-        val link = "https://scws.xyz/master/$scwsid?token=$token&expires=$expire&n=1&n=1"
+        val link = "https://scws.work/master/$scwsid?token=$token&expires=$expire&n=1&n=1"
         getM3u8Qualities(link, data, URI(link).host).forEach(callback)
         return true
     }
