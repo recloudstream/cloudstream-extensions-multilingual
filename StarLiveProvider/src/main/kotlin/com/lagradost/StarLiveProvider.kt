@@ -43,7 +43,7 @@ class StarLiveProvider : MainAPI() {
                 LiveSearchResponse(
                     matchName,
                     "{\"linkData\": $href , \"matchData\":{\"time\": \"$date\", \"poster\":\"$posterUrl\"}}",
-                    this@StarliveProvider.name,
+                    this@StarLiveProvider.name,
                     TvType.Live,
                     posterUrl,
                 )
@@ -81,7 +81,7 @@ class StarLiveProvider : MainAPI() {
             name = matchdata?.linkData?.firstOrNull()?.name?:mainUrl,
             posterUrl = poster,
             plot = Matchstart,
-            apiName = this@StarliveProvider.name
+            apiName = this@StarLiveProvider.name
         )
 
 
