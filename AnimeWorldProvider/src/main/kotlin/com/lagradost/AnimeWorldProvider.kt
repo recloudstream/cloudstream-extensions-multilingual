@@ -132,9 +132,12 @@ class AnimeWorldProvider : MainAPI() {
     }
 
     override suspend fun getMainPage(page: Int, request : MainPageRequest): HomePageResponse {
-        val document = request(mainUrl).document
+        val pagedata = request(mainUrl)
+        val document = pagedata.document
         val list = ArrayList<HomePageList>()
-
+        token = document.getElementById("csrf-token")?.attr("content")?:""
+        cookies = pagedata.cookies
+        
         val widget = document.select(".widget.hotnew")
         widget.select(".tabs [data-name=\"sub\"], .tabs [data-name=\"dub\"]").forEach { tab ->
             val tabId = tab.attr("data-name")

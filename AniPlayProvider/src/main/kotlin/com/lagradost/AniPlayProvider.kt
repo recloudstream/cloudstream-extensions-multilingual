@@ -15,6 +15,7 @@ class AniPlayProvider : MainAPI() {
     override var name = "AniPlay"
     override var lang = "it"
     override val hasMainPage = true
+    override val hasQuickSearch = true
     private val dubIdentifier = " (ITA)"
 
     override val supportedTypes = setOf(
@@ -133,6 +134,22 @@ class AniPlayProvider : MainAPI() {
         return HomePageResponse(listOf(HomePageList("Ultime uscite",results)))
     }
 
+    override suspend fun quickSearch(query: String): List<SearchResponse>? {
+        val response = parseJson<List<ApiSearchResult>>(app.get("$mainUrl/api/anime/search?query=$query").text)
+
+        return response.map {
+            val isDub = isDub(it.title)
+
+            newAnimeSearchResponse(
+                name = if (isDub) it.title.replace(dubIdentifier, "") else it.title,
+                url = "$mainUrl/api/anime/${it.id}",
+                type = getType(it.type),
+            ){
+                addDubStatus(isDub)
+                this.posterUrl = it.posters.first().posterUrl
+            }
+        }
+    }
     override suspend fun search(query: String): List<SearchResponse> {
         val response = parseJson<List<ApiSearchResult>>(app.get("$mainUrl/api/anime/advanced-search?page=0&size=36&query=$query").text)
 

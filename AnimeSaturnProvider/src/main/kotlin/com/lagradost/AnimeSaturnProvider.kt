@@ -1,10 +1,12 @@
 package com.lagradost
 
+import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addAniListId
 import com.lagradost.cloudstream3.LoadResponse.Companion.addDuration
 import com.lagradost.cloudstream3.LoadResponse.Companion.addMalId
 import com.lagradost.cloudstream3.LoadResponse.Companion.addRating
+import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.Qualities
 import org.jsoup.nodes.Element
@@ -14,6 +16,7 @@ class AnimeSaturnProvider : MainAPI() {
     override var name = "AnimeSaturn"
     override var lang = "it"
     override val hasMainPage = true
+    override val hasQuickSearch = true
 
     override val supportedTypes = setOf(
         TvType.Anime,
@@ -21,6 +24,12 @@ class AnimeSaturnProvider : MainAPI() {
         TvType.OVA
     )
 
+    private data class QuickSearchParse(
+        @JsonProperty("link") val link: String,
+        @JsonProperty("image") val image: String,
+        @JsonProperty("name") val name: String
+    )
+    
     companion object {
         fun getStatus(t: String?): ShowStatus? {
             return when (t?.lowercase()) {
@@ -89,6 +98,17 @@ class AnimeSaturnProvider : MainAPI() {
             list.add(HomePageList(tabName, results))
         }
         return HomePageResponse(list)
+    }
+
+    override suspend fun quickSearch(query: String): List<SearchResponse>? {
+        val quickSearchJ = app.get("$mainUrl/index.php?search=1&key=$query").text
+        return tryParseJson<List<QuickSearchParse>>(quickSearchJ)?.map {
+            newAnimeSearchResponse(it.name.replace(" (ITA)", ""), it.link, TvType.Anime) {
+                addDubStatus(it.name.contains(" (ITA)"))
+                this.posterUrl = it.image
+            }
+        }
+
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
