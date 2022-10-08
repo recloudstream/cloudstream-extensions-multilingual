@@ -1,14 +1,14 @@
 package com.lagradost
 
-import android.os.Build
 import android.util.Log
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.AppUtils
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
+import org.jsoup.nodes.Document
 import org.jsoup.select.Elements
-import java.time.LocalDateTime
+import java.util.Calendar
 
 class PinoyMoviesHub : MainAPI() {
     //private val TAG = "Dev"
@@ -67,6 +67,7 @@ class PinoyMoviesHub : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
+        val apiName = this.name
         val doc = app.get(url).document
         val body = doc.getElementsByTag("body").firstOrNull()
         val sheader = body?.selectFirst("div.sheader")
@@ -109,46 +110,45 @@ class PinoyMoviesHub : MainAPI() {
                 val epPoster = imageEl?.attr("src") ?: imageEl?.attr("data-src")
                 val date = it.selectFirst("span.date")?.text()
 
-                val ep = Episode(
-                    name = firstA.text(),
-                    data = eplink,
-                    posterUrl = epPoster,
-                    episode = epCount,
-                    season = seasCount,
-                )
-                ep.addDate(parseDateFromString(date))
-                ep
-        } ?: listOf()
+                newEpisode(
+                    data = eplink
+                ) {
+                    this.name = firstA.text()
+                    this.posterUrl = epPoster
+                    this.episode = epCount
+                    this.season = seasCount
+                    this.addDate(parseDateFromString(date))
+                }
+        } ?: emptyList()
 
-        val dataUrl = doc.selectFirst("link[rel='shortlink']")
-            ?.attr("href")
-            ?.substringAfter("?p=") ?: ""
-        //Log.i(TAG, "Result => (dataUrl) ${dataUrl}")
+        val dataUrl = doc.getMovieId() ?: throw Exception("Movie Id is Null!")
 
         if (episodeList.isNotEmpty()) {
-            return TvSeriesLoadResponse(
+            return newTvSeriesLoadResponse(
                 name = title,
                 url = url,
-                apiName = this.name,
                 type = TvType.TvSeries,
-                posterUrl = poster,
-                year = year,
-                plot = descript,
                 episodes = episodeList
-            )
+            ) {
+                this.apiName = apiName
+                this.posterUrl = poster
+                this.year = year
+                this.plot = descript
+            }
         }
 
         //Log.i(TAG, "Result => (id) ${id}")
-        return MovieLoadResponse(
+        return newMovieLoadResponse(
             name = title,
             url = url,
             dataUrl = dataUrl,
-            apiName = this.name,
             type = TvType.Movie,
-            posterUrl = poster,
-            year = year,
-            plot = descript,
-        )
+        ) {
+            this.apiName = apiName
+            this.posterUrl = poster
+            this.year = year
+            this.plot = descript
+        }
     }
 
     override suspend fun loadLinks(
@@ -158,11 +158,18 @@ class PinoyMoviesHub : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
 
-        //Log.i(TAG, "Loading ajax request..")
+        var movieId = data
+        //If episode link, fetch movie id first
+        if (movieId.startsWith(mainUrl)) {
+            movieId = app.get(data).document.getMovieId() ?: throw Exception("Movie Id is Null!")
+        }
+
         val requestLink = "${mainUrl}/wp-admin/admin-ajax.php"
         val action = "doo_player_ajax"
         val nume = "1"
         val type = "movie"
+
+        //Log.i(TAG, "Loading ajax request..")
         val doc = app.post(
             url = requestLink,
             referer = mainUrl,
@@ -172,14 +179,13 @@ class PinoyMoviesHub : MainAPI() {
             ),
             data = mapOf(
                 Pair("action", action),
-                Pair("post", data),
+                Pair("post", movieId),
                 Pair("nume", nume),
                 Pair("type", type)
             )
         )
         //Log.i(TAG, "Response (${doc.code}) => ${doc.text}")
-        AppUtils.tryParseJson<Response?>(doc.text)?.let {
-            val streamLink = it.embed_url ?: ""
+        AppUtils.tryParseJson<Response?>(doc.text)?.embed_url?.let { streamLink ->
             //Log.i(TAG, "Response (streamLink) => ${streamLink}")
             if (streamLink.isNotBlank()) {
                 loadExtractor(
@@ -188,9 +194,16 @@ class PinoyMoviesHub : MainAPI() {
                     callback = callback,
                     subtitleCallback = subtitleCallback
                 )
+                return true
             }
         }
-        return true
+        return false
+    }
+
+    private fun Document.getMovieId(): String? {
+        return this.selectFirst("link[rel='shortlink']")
+            ?.attr("href")
+            ?.substringAfter("?p=")
     }
 
     private fun Elements?.getResults(apiName: String): List<SearchResponse> {
@@ -284,11 +297,7 @@ class PinoyMoviesHub : MainAPI() {
             month = "01"
         }
         if (year.isBlank()) {
-            year = if (Build.VERSION.SDK_INT >= 26) {
-                LocalDateTime.now().year.toString()
-            } else {
-                "0001"
-            }
+            year = Calendar.getInstance().get(Calendar.YEAR).toString()
         }
         return "$year-$month-$day"
     }
