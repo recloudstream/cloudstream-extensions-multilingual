@@ -1,15 +1,13 @@
 package com.lagradost
 
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.LoadResponse.Companion.addRating
 import com.lagradost.cloudstream3.utils.AppUtils.toJson
 import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ShortLink
 import com.lagradost.cloudstream3.utils.loadExtractor
-import org.jsoup.Jsoup
-import org.jsoup.nodes.Element
+
 
 
 class IlGenioDelloStreamingProvider : MainAPI() {
@@ -18,6 +16,7 @@ class IlGenioDelloStreamingProvider : MainAPI() {
     override var name = "IlGenioDelloStreaming"
     override val hasMainPage = true
     override val hasChromecastSupport = true
+    override var sequentialMainPage = true
     override val supportedTypes = setOf(
         TvType.Movie,
         TvType.TvSeries,
@@ -126,7 +125,7 @@ class IlGenioDelloStreamingProvider : MainAPI() {
                                     name = "$epName ${subtag.uppercase()}",
                                     episode = seasonNo?.text()?.substringAfter("x")?.filter { it.isDigit() }?.toIntOrNull()
 
-                                    ))
+                                ))
                             }
 
 

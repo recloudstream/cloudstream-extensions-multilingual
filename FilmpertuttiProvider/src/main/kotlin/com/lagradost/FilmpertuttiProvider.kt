@@ -15,19 +15,19 @@ import com.lagradost.cloudstream3.utils.AppUtils.html
 
 class FilmpertuttiProvider : MainAPI() {
     override var lang = "it"
-    override var mainUrl = "https://filmpertutti.photo"
-    override var name = "Filmpertutti"
+    override var mainUrl = "https://filmpertutti.sbs"
+    override var name = "FilmPerTutti"
     override val hasMainPage = true
     override val hasChromecastSupport = true
     override val supportedTypes = setOf(
         TvType.Movie,
         TvType.TvSeries
     )
-
+    override var sequentialMainPage = true
     override val mainPage = mainPageOf(
         Pair("$mainUrl/category/film/page/", "Film Popolari"),
         Pair("$mainUrl/category/serie-tv/page/", "Serie Tv Popolari"),
-        Pair("$mainUrl/prime-visioni/", "Ultime uscite"),
+        Pair("$mainUrl/prime-visioni/", "Ultime uscite")
     )
 
     override suspend fun getMainPage(
@@ -35,8 +35,7 @@ class FilmpertuttiProvider : MainAPI() {
         request: MainPageRequest
     ): HomePageResponse {
         val url = request.data + page
-
-        val soup = app.get(url).document
+        val soup = app.get(url, referer = mainUrl).document
         val home = soup.select("ul.posts > li").map {
             val title = it.selectFirst("div.title")!!.text().substringBeforeLast("(")
                 .substringBeforeLast("[")
