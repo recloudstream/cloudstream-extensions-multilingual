@@ -203,6 +203,7 @@ class PinoyMoviesHub : MainAPI() {
     private fun Document.getMovieId(): String? {
         return this.selectFirst("link[rel='shortlink']")
             ?.attr("href")
+            ?.trim()
             ?.substringAfter("?p=")
     }
 
@@ -252,7 +253,7 @@ class PinoyMoviesHub : MainAPI() {
                     quality = qual,
                 )
             }
-        } ?: listOf()
+        } ?: emptyList()
     }
 
     private fun parseDateFromString(text: String?): String? {
@@ -262,7 +263,7 @@ class PinoyMoviesHub : MainAPI() {
         var day = ""
         var month = ""
         var year = ""
-        val dateSplit = text.split(".")
+        val dateSplit = text.trim().split(".")
         if (dateSplit.isNotEmpty()) {
             if (dateSplit.size > 1) {
                 val yearday = dateSplit[1].trim()
