@@ -9,7 +9,7 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 
 class HDMovie5 : MainAPI() {
-    override var mainUrl = "https://hdmovie2.rip"
+    override var mainUrl = "https://hdmovie2.skin"
     override var name = "HDMovie"
     override var lang = "hi"
 
