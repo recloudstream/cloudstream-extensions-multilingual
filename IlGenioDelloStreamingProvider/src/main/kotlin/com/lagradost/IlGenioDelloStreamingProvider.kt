@@ -2,6 +2,7 @@ package com.lagradost
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addRating
+import com.lagradost.cloudstream3.network.CloudflareKiller
 import com.lagradost.cloudstream3.utils.AppUtils.toJson
 import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
@@ -27,13 +28,13 @@ class IlGenioDelloStreamingProvider : MainAPI() {
         Pair("$mainUrl/the-most-voted/page/", "I più votati"),
         Pair("$mainUrl/prime-visioni/page/", "Ultime uscite"),
     )
-
+    private val interceptor = CloudflareKiller()
     override suspend fun getMainPage(
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
         val url = request.data + page
-        val soup = app.get(url).document
+        val soup = app.get(url, interceptor = interceptor).document
         val home = soup.select("div.items > article.item").map {
             val title = it.selectFirst("div.data > h3 > a")!!.text().substringBeforeLast("(").substringBeforeLast("[")
             val link = it.selectFirst("div.poster > a")!!.attr("href")
@@ -55,7 +56,7 @@ class IlGenioDelloStreamingProvider : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         val queryformatted = query.replace(" ", "+")
         val url = "$mainUrl?s=$queryformatted"
-        val doc = app.get(url,referer= mainUrl ).document
+        val doc = app.get(url, interceptor = interceptor, referer = mainUrl).document
         return doc.select("div.result-item").map {
             val href = it.selectFirst("div.image > div > a")!!.attr("href")
             val poster = it.selectFirst("div.image > div > a > img")!!.attr("src")
@@ -72,7 +73,7 @@ class IlGenioDelloStreamingProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val page = app.get(url)
+        val page = app.get(url, interceptor = interceptor)
         val document = page.document
         val type = if (document.select("div.seasons-wraper").isNotEmpty()){TvType.TvSeries} else{TvType.Movie}
         val title = document.selectFirst("div.data > h1")!!.text().substringBefore("(").substringBefore("[")
@@ -127,9 +128,6 @@ class IlGenioDelloStreamingProvider : MainAPI() {
 
                                 ))
                             }
-
-
-
                         }
                 }
 
