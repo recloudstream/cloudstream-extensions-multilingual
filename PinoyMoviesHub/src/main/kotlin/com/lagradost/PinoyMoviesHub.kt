@@ -158,7 +158,7 @@ class PinoyMoviesHub : MainAPI() {
     ): Boolean {
 
         var movieId = data
-        Log.i(TAG, "movieId => $movieId")
+        //Log.i(TAG, "movieId => $movieId")
         //If episode link, fetch movie id first
         if (movieId.startsWith(mainUrl)) {
             movieId = app.get(data).document.getMovieId() ?: throw Exception("Movie Id is Null!")
@@ -170,8 +170,8 @@ class PinoyMoviesHub : MainAPI() {
         val type = "movie"
         val seriesTvUrl = "https://series.pinoymovies.tv"
 
-        Log.i(TAG, "Loading ajax request..")
-        Log.i(TAG, "movieId => $movieId")
+        //Log.i(TAG, "Loading ajax request..")
+        //Log.i(TAG, "movieId => $movieId")
         val doc = app.post(
             url = requestLink,
             referer = mainUrl,
@@ -187,16 +187,16 @@ class PinoyMoviesHub : MainAPI() {
             )
         )
 
-        Log.i(TAG, "Response (${doc.code}) => ${doc.text}")
+        //Log.i(TAG, "Response (${doc.code}) => ${doc.text}")
         tryParseJson<Response?>(doc.text)?.embed_url?.let { streamLink ->
-            Log.i(TAG, "Response (streamLink) => $streamLink")
+            //Log.i(TAG, "Response (streamLink) => $streamLink")
             if (streamLink.isNotBlank()) {
                 //Decrypt links from https://series.pinoymovies.tv/video/135647s1e1?sid=503&t=alt
                 if (streamLink.startsWith(seriesTvUrl)) {
                     //Add suffix: '?sid=503&t=alt' to 'series.pinoymovies.tv' links
                     val linkSuffix = "?sid=503&t=alt"
                     val newLink = streamLink.replace(linkSuffix, "") + linkSuffix
-                    Log.i(TAG, "Response (newLink) => $newLink")
+                    //Log.i(TAG, "Response (newLink) => $newLink")
                     app.get(newLink, referer = streamLink).let { packeddoc ->
                         val packedString = packeddoc.document.select("script").toString()
                         //Log.i(TAG, "Response (packedString) => $packedString")
@@ -210,7 +210,7 @@ class PinoyMoviesHub : MainAPI() {
                             ?.trimEnd(',')
                             ?.replace("sources:", "\"sources\":")
                             ?.replace("'", "\"")
-                        Log.i(TAG, "Response (newString2) => $newString2")
+                        //Log.i(TAG, "Response (newString2) => $newString2")
 
                         tryParseJson<List<ResponseData?>?>(newString2)?.let { respData ->
                             respData.forEach outer@{ respDataItem ->
