@@ -1,6 +1,6 @@
 # Cloudstream Non-English Plugin Repository 
 
-All available repositories: https://recloudstream.github.io/repos/
+All available repositories: https://cloudstream.cf/repos
 
 Not all extractors are included, only those need to compile. We need to use loadExtractor in the future.
 
