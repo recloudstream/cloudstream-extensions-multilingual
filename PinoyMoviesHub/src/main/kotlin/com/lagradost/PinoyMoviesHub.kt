@@ -3,15 +3,14 @@ package com.lagradost
 import android.util.Log
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.AppUtils
-import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.loadExtractor
+import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import org.jsoup.nodes.Document
 import org.jsoup.select.Elements
 import java.util.Calendar
 
 class PinoyMoviesHub : MainAPI() {
-    //private val TAG = "Dev"
+    private val TAG = "DevDebug"
     override var name = "Pinoy Movies Hub"
     override var mainUrl = "https://pinoymovieshub.ph"
     override var lang = "tl"
@@ -159,6 +158,7 @@ class PinoyMoviesHub : MainAPI() {
     ): Boolean {
 
         var movieId = data
+        //Log.i(TAG, "movieId => $movieId")
         //If episode link, fetch movie id first
         if (movieId.startsWith(mainUrl)) {
             movieId = app.get(data).document.getMovieId() ?: throw Exception("Movie Id is Null!")
@@ -168,8 +168,10 @@ class PinoyMoviesHub : MainAPI() {
         val action = "doo_player_ajax"
         val nume = "1"
         val type = "movie"
+        val seriesTvUrl = "https://series.pinoymovies.tv"
 
         //Log.i(TAG, "Loading ajax request..")
+        //Log.i(TAG, "movieId => $movieId")
         val doc = app.post(
             url = requestLink,
             referer = mainUrl,
@@ -184,16 +186,58 @@ class PinoyMoviesHub : MainAPI() {
                 Pair("type", type)
             )
         )
+
         //Log.i(TAG, "Response (${doc.code}) => ${doc.text}")
-        AppUtils.tryParseJson<Response?>(doc.text)?.embed_url?.let { streamLink ->
-            //Log.i(TAG, "Response (streamLink) => ${streamLink}")
+        tryParseJson<Response?>(doc.text)?.embed_url?.let { streamLink ->
+            //Log.i(TAG, "Response (streamLink) => $streamLink")
             if (streamLink.isNotBlank()) {
-                loadExtractor(
-                    url = streamLink,
-                    referer = mainUrl,
-                    callback = callback,
-                    subtitleCallback = subtitleCallback
-                )
+                //Decrypt links from https://series.pinoymovies.tv/video/135647s1e1?sid=503&t=alt
+                if (streamLink.startsWith(seriesTvUrl)) {
+                    //Add suffix: '?sid=503&t=alt' to 'series.pinoymovies.tv' links
+                    val linkSuffix = "?sid=503&t=alt"
+                    val newLink = streamLink.replace(linkSuffix, "") + linkSuffix
+                    //Log.i(TAG, "Response (newLink) => $newLink")
+                    app.get(newLink, referer = streamLink).let { packeddoc ->
+                        val packedString = packeddoc.document.select("script").toString()
+                        //Log.i(TAG, "Response (packedString) => $packedString")
+
+                        val newString = getAndUnpack(packedString)
+                        //Log.i(TAG, "Response (newString) => $newString")
+
+                        val regex = Regex("(?<=playlist:)(.*)(?=autostart)", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))
+                        val newString2 = regex.find(newString)?.groupValues
+                            ?.getOrNull(1)?.trim()
+                            ?.trimEnd(',')
+                            ?.replace("sources:", "\"sources\":")
+                            ?.replace("'", "\"")
+                        //Log.i(TAG, "Response (newString2) => $newString2")
+
+                        tryParseJson<List<ResponseData?>?>(newString2)?.let { respData ->
+                            respData.forEach outer@{ respDataItem ->
+                                respDataItem?.sources?.forEach inner@{ srclink ->
+                                    val link = srclink.file ?: return@inner
+                                    callback.invoke(
+                                        ExtractorLink(
+                                            name = this.name,
+                                            source = this.name,
+                                            url = link,
+                                            quality = getQualityFromName(srclink.label),
+                                            referer = seriesTvUrl,
+                                            isM3u8 = link.endsWith("m3u8")
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    loadExtractor(
+                        url = streamLink,
+                        referer = mainUrl,
+                        callback = callback,
+                        subtitleCallback = subtitleCallback
+                    )
+                }
                 return true
             }
         }
@@ -305,5 +349,16 @@ class PinoyMoviesHub : MainAPI() {
 
     private data class Response(
         @JsonProperty("embed_url") val embed_url: String?
+    )
+
+    private data class ResponseData(
+        @JsonProperty("sources") val sources: List<ResponseSources>?,
+        @JsonProperty("image") val image: String?,
+    )
+
+    private data class ResponseSources(
+        @JsonProperty("label") val label: String?,
+        @JsonProperty("type") val type: String?,
+        @JsonProperty("file") val file: String?
     )
 }
