@@ -16,7 +16,7 @@ import com.lagradost.cloudstream3.network.CloudflareKiller
 
 class FilmpertuttiProvider : MainAPI() {
     override var lang = "it"
-    override var mainUrl = "https://filmpertutti.sbs"
+    override var mainUrl = "https://filmpertutti.hair"
     override var name = "FilmPerTutti"
     override val hasMainPage = true
     override val hasChromecastSupport = true
@@ -31,13 +31,13 @@ class FilmpertuttiProvider : MainAPI() {
         Pair("$mainUrl/prime-visioni/", "Ultime uscite")
     )
 
-    private val interceptor = CloudflareKiller()
+    // private val interceptor = CloudflareKiller()
     override suspend fun getMainPage(
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
         val url = request.data + page
-        val soup = app.get(url, interceptor = interceptor,  referer = mainUrl).document
+        val soup = app.get(url,  referer = mainUrl).document // interceptor = interceptor
         val home = soup.select("ul.posts > li").map {
             val title = it.selectFirst("div.title")!!.text().substringBeforeLast("(")
                 .substringBeforeLast("[")
@@ -64,7 +64,7 @@ class FilmpertuttiProvider : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         val queryformatted = query.replace(" ", "+")
         val url = "$mainUrl/?s=$queryformatted"
-        val doc = app.get(url, interceptor = interceptor).document
+        val doc = app.get(url).document // interceptor = interceptor
         return doc.select("ul.posts > li").map {
             val title = it.selectFirst("div.title")!!.text().substringBeforeLast("(")
                 .substringBeforeLast("[")
@@ -83,7 +83,7 @@ class FilmpertuttiProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val document = app.get(url, interceptor = interceptor).document
+        val document = app.get(url).document // interceptor = interceptor
         val type =
             if (document.selectFirst("a.taxonomy.category")!!.attr("href").contains("serie-tv")
                     .not()
