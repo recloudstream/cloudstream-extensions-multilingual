@@ -9,7 +9,7 @@ import com.lagradost.cloudstream3.utils.AppUtils.toJson
 
 class EurostreamingProvider : MainAPI() {
     override var lang = "it"
-    override var mainUrl = "https://eurostreaming.social"
+    override var mainUrl = "https://eurostreaming.boats"
     override var name = "Eurostreaming"
     override val hasMainPage = true
     override val hasChromecastSupport = true
