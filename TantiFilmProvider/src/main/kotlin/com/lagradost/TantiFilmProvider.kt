@@ -9,7 +9,7 @@ import com.lagradost.cloudstream3.network.CloudflareKiller
 
 class TantifilmProvider : MainAPI() {
     override var lang = "it"
-    override var mainUrl = "https://tantifilm.yachts"
+    override var mainUrl = "https://tantifilm.tattoo"
     override var name = "Tantifilm"
     override val hasMainPage = true
     override val hasChromecastSupport = true
@@ -52,7 +52,7 @@ class TantifilmProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val queryformatted = query.replace(" ", "+")
-        val url = "$mainUrl/search/$queryformatted"
+        val url = "$mainUrl/?s=$queryformatted"
 
         val doc = app.get(url, interceptor = interceptor).document
         return doc.select("div.film.film-2").map {
