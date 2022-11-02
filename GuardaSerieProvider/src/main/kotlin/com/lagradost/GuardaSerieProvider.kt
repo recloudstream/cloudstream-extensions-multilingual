@@ -75,7 +75,7 @@ class GuardaSerieProvider : MainAPI() {
         val description = document.selectFirst("div.tv_info_right")?.textNodes()?.joinToString("")
         val rating = document.selectFirst("span.post-ratings")?.text()
         var year = document.select("div.tv_info_list > ul").find { it.text().contains("Anno") }?.text()?.substringBefore("-")?.filter { it.isDigit() }?.toIntOrNull()
-        val poster = fixUrl(document.selectFirst("#cover")!!.attr("src"))
+        val poster = fixUrl(document.selectFirst("#cover")!!.attr("src")).replace("/141x200-0-85/", "/60x85-0-85/")
 
         val episodeList = document.select("div.tab-content > div").mapIndexed { season, data ->
             data.select("li").mapIndexed { epNum, epData ->
