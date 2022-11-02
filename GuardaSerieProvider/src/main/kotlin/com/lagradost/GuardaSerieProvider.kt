@@ -32,7 +32,7 @@ class GuardaSerieProvider : MainAPI() {
         val home = soup.select("div.mlnew").drop(1).map { series ->
             val title = series.selectFirst("div.mlnh-2")!!.text()
             val link = series.selectFirst("div.mlnh-2 > h2 > a")!!.attr("href")
-            val posterUrl = fixUrl(series.selectFirst("img")!!.attr("src"))
+            val posterUrl = fixUrl(series.selectFirst("img")!!.attr("src")).replace("/60x85-0-85/", "/141x200-0-85/")
 
             newTvSeriesSearchResponse(
                 title,
@@ -57,7 +57,7 @@ class GuardaSerieProvider : MainAPI() {
         return doc.select("div.mlnew").drop(1).map { series ->
             val title = series.selectFirst("div.mlnh-2")!!.text()
             val link = series.selectFirst("div.mlnh-2 > h2 > a")!!.attr("href")
-            val posterUrl = fixUrl(series.selectFirst("img")!!.attr("src"))
+            val posterUrl = fixUrl(series.selectFirst("img")!!.attr("src")).replace("/60x85-0-85/", "/141x200-0-85/")
             newMovieSearchResponse(
                 title,
                 link,
@@ -75,7 +75,7 @@ class GuardaSerieProvider : MainAPI() {
         val description = document.selectFirst("div.tv_info_right")?.textNodes()?.joinToString("")
         val rating = document.selectFirst("span.post-ratings")?.text()
         var year = document.select("div.tv_info_list > ul").find { it.text().contains("Anno") }?.text()?.substringBefore("-")?.filter { it.isDigit() }?.toIntOrNull()
-        val poster = fixUrl(document.selectFirst("#cover")!!.attr("src")).replace("/141x200-0-85/", "/60x85-0-85/")
+        val poster = fixUrl(document.selectFirst("#cover")!!.attr("src"))
 
         val episodeList = document.select("div.tab-content > div").mapIndexed { season, data ->
             data.select("li").mapIndexed { epNum, epData ->
