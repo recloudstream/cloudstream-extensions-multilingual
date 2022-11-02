@@ -170,9 +170,9 @@ class StreamingcommunityProvider: MainAPI() {
         }
     }
 
-    companion object {
-        val posterMap = hashMapOf<String, String>()
-    }
+//    companion object {
+//        val posterMap = hashMapOf<String, String>()
+//    }
 
     override suspend fun getMainPage(page: Int, request : MainPageRequest): HomePageResponse {
         val items = ArrayList<HomePageList>()
@@ -191,7 +191,7 @@ class StreamingcommunityProvider: MainAPI() {
                     val ip = translateip(searchr.images[0].proxyID.toInt())
                     val posterurl = "https://$ip/images/$number/$img"
                     val videourl = "$mainUrl/titles/$id-$name"
-                    posterMap[videourl] = posterurl
+                    //posterMap[videourl] = posterurl
                     val data = app.post("$mainUrl/api/titles/preview/$id", referer = mainUrl).text
                     val datajs = parseJson<Moviedata>(data)
                     val type: TvType = if (datajs.type == "movie") {
@@ -239,7 +239,7 @@ class StreamingcommunityProvider: MainAPI() {
             val datajs = parseJson<Moviedata>(data)
             val posterurl = "https://$ip/images/$number/$img"
             val videourl = "$mainUrl/titles/$id-$name"
-            posterMap[videourl] = posterurl
+            //posterMap[videourl] = posterurl
             if (datajs.type == "movie") {
                 val type = TvType.Movie
                 MovieSearchResponse(
@@ -271,7 +271,8 @@ class StreamingcommunityProvider: MainAPI() {
     override suspend fun load(url: String): LoadResponse {
 
         val document = app.get(url).document
-        val poster = posterMap[url]
+        val poster = Regex("url\\('(.*)'").find(document.selectFirst("div.title-wrap")?.attributes()
+            ?.get("style") ?: "")?.groupValues?.last() //posterMap[url]
         val id = url.substringBefore("-").filter { it.isDigit() }
         val data = app.post("$mainUrl/api/titles/preview/$id", referer = mainUrl).text
 
@@ -307,7 +308,7 @@ class StreamingcommunityProvider: MainAPI() {
             val videourl = "$mainUrl/titles/$idcorr-$name"
             val posterurl = "https://$ip/images/$number/$img"
 
-            posterMap[videourl] = posterurl
+            //posterMap[videourl] = posterurl
             val typecorr: TvType = if (datajscorrel.type == "movie") {
                 TvType.Movie
             } else {
