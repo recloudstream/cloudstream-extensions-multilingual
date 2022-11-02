@@ -32,7 +32,7 @@ class GuardaSerieProvider : MainAPI() {
         val home = soup.select("div.mlnew").drop(1).map { series ->
             val title = series.selectFirst("div.mlnh-2")!!.text()
             val link = series.selectFirst("div.mlnh-2 > h2 > a")!!.attr("href")
-            val posterUrl = fixUrl(series.selectFirst("img")!!.attr("src"))
+            val posterUrl = fixUrl(series.selectFirst("img")!!.attr("src")).replace("/60x85-0-85/", "/141x200-0-85/")
 
             newTvSeriesSearchResponse(
                 title,
@@ -40,6 +40,7 @@ class GuardaSerieProvider : MainAPI() {
                 TvType.TvSeries
             ) {
                 this.posterUrl = posterUrl
+                this.posterHeaders = mapOf("user-agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36")
             }
 
         }
@@ -57,13 +58,14 @@ class GuardaSerieProvider : MainAPI() {
         return doc.select("div.mlnew").drop(1).map { series ->
             val title = series.selectFirst("div.mlnh-2")!!.text()
             val link = series.selectFirst("div.mlnh-2 > h2 > a")!!.attr("href")
-            val posterUrl = fixUrl(series.selectFirst("img")!!.attr("src"))
+            val posterUrl = fixUrl(series.selectFirst("img")!!.attr("src")).replace("/60x85-0-85/", "/141x200-0-85/")
             newMovieSearchResponse(
                 title,
                 link,
                 TvType.Movie
             ) {
                 this.posterUrl = posterUrl
+                this.posterHeaders = mapOf("user-agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36")
             }
 
         }
@@ -72,10 +74,12 @@ class GuardaSerieProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse {
         val document = app.get(url).document
         val title = document.selectFirst("h1")!!.text().removeSuffix(" streaming")
-        val description = document.selectFirst("div.tv_info_right")?.textNodes()?.joinToString("")
+        val description = document.selectFirst("div.tv_info_right")?.textNodes()?.joinToString("")?.removeSuffix("!")?.trim()
         val rating = document.selectFirst("span.post-ratings")?.text()
         var year = document.select("div.tv_info_list > ul").find { it.text().contains("Anno") }?.text()?.substringBefore("-")?.filter { it.isDigit() }?.toIntOrNull()
-        val poster = fixUrl(document.selectFirst("#cover")!!.attr("src")).replace("/141x200-0-85/", "/60x85-0-85/")
+        val poster = Regex("poster: '(.*)'").find(document.html())?.groups?.lastOrNull()?.value?.let {
+            fixUrl( it )
+        }?: fixUrl(document.selectFirst("#cover")!!.attr("src"))
 
         val episodeList = document.select("div.tab-content > div").mapIndexed { season, data ->
             data.select("li").mapIndexed { epNum, epData ->
@@ -101,6 +105,7 @@ class GuardaSerieProvider : MainAPI() {
             this.plot = description
             this.year = year
             this.posterUrl = poster
+            this.posterHeaders = mapOf("user-agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36")
         }
     }
 
