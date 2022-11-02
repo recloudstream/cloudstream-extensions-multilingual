@@ -25,6 +25,7 @@ class FilmpertuttiProvider : MainAPI() {
         TvType.TvSeries
     )
     override var sequentialMainPage = true
+    override var sequentialMainPageDelay = 500
     override val mainPage = mainPageOf(
         Pair("$mainUrl/category/film/page/", "Film Popolari"),
         Pair("$mainUrl/category/serie-tv/page/", "Serie Tv Popolari"),
