@@ -1,6 +1,7 @@
 package com.lagradost
 
 import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
 
@@ -32,7 +33,7 @@ class CineBlog01Provider : MainAPI() {
             val posterUrl = fixUrl(series.selectFirst("img")!!.attr("src"))
             val quality = Regex("\\[([^\\]]*)]").find(series.selectFirst("h1")!!.text())?.groupValues?.get(1)
             val year = Regex("\\(([^)]*)\\)").find(series.selectFirst("h1")!!.text())?.groupValues?.get(1)?.toIntOrNull()
-            
+
             newMovieSearchResponse(
                 title,
                 link,
@@ -83,6 +84,10 @@ class CineBlog01Provider : MainAPI() {
         val dataUrl = document.select("ul.mirrors-list__list > li").map {
             it.select("a").attr("href")
         }.drop(1).joinToString (",")
+        val trailerUrl =
+            document.select("iframe").firstOrNull { it.attr("src").contains("youtube") }?.attr("src")
+                ?.let { fixUrl(it) }
+
         return newMovieLoadResponse(
             title,
             url,
@@ -93,6 +98,7 @@ class CineBlog01Provider : MainAPI() {
             this.plot = description
             this.year = year
             this.posterUrl = poster
+            addTrailer(trailerUrl)
         }
     }
 
