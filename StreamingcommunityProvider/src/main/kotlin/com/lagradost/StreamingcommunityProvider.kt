@@ -432,13 +432,17 @@ class StreamingcommunityProvider: MainAPI() {
         val token = token2.replace("=", "").replace("+", "-").replace("/", "_")
 
         val link = "https://scws.work/master/$scwsid?token=$token&expires=$expire&n=1"
-        Regex("URI=\".*\"").findAll(app.get("https://scws.work/master/$scwsid?token=$token&expires=$expire&n=1").text).toList().filter{it.value.contains("auto-forced").not()}.map{
-            val link = app.get(it.value.substringAfter("\"").dropLast(1)).text.lines().filter{it.contains("http")}[0]
-            val lang = it.value.substringAfter("rendition=").substringBefore("&")
-            SubtitleFile(lang, link)
-        }.forEach(subtitleCallback)
-
-        getM3u8Qualities(link, data, URI(link).host).forEach(callback)
+        
+        callback.invoke(
+            ExtractorLink(
+                name,
+                name,
+                link,
+                isM3u8 = true,
+                referer = mainUrl,
+                quality = Qualities.Unknown.value
+            )
+        )
         return true
     }
 }
