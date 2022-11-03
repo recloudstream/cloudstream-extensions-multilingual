@@ -25,20 +25,20 @@ class FilmpertuttiProvider : MainAPI() {
         TvType.TvSeries
     )
     override var sequentialMainPage = true
-    override var sequentialMainPageDelay: Long = 500
+    override var sequentialMainPageDelay: Long = 200
     override val mainPage = mainPageOf(
         Pair("$mainUrl/category/film/page/", "Film Popolari"),
         Pair("$mainUrl/category/serie-tv/page/", "Serie Tv Popolari"),
         Pair("$mainUrl/prime-visioni/", "Ultime uscite")
     )
 
-    // private val interceptor = CloudflareKiller()
+    private val interceptor = CloudflareKiller()
     override suspend fun getMainPage(
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
         val url = request.data + page
-        val soup = app.get(url,  referer = mainUrl).document // interceptor = interceptor
+        val soup = app.get(url, interceptor = interceptor, referer = mainUrl).document
         val home = soup.select("ul.posts > li").map {
             val title = it.selectFirst("div.title")!!.text().substringBeforeLast("(")
                 .substringBeforeLast("[")
@@ -65,7 +65,7 @@ class FilmpertuttiProvider : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         val queryformatted = query.replace(" ", "+")
         val url = "$mainUrl/?s=$queryformatted"
-        val doc = app.get(url).document // interceptor = interceptor
+        val doc = app.get(url, interceptor = interceptor).document 
         return doc.select("ul.posts > li").map {
             val title = it.selectFirst("div.title")!!.text().substringBeforeLast("(")
                 .substringBeforeLast("[")
@@ -84,7 +84,7 @@ class FilmpertuttiProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val document = app.get(url).document // interceptor = interceptor
+        val document = app.get(url, interceptor = interceptor).document
         val type =
             if (document.selectFirst("a.taxonomy.category")!!.attr("href").contains("serie-tv")
                     .not()
