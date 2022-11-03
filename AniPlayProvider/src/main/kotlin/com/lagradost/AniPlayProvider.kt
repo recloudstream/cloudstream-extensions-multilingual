@@ -51,11 +51,15 @@ class AniPlayProvider : MainAPI() {
 
     data class ApiMainPageAnime(
         @JsonProperty("animeId") val id: Int,
+        @JsonProperty("id") val id2: Int,
         @JsonProperty("episodeNumber") val episode: String?,
-        @JsonProperty("animeTitle") val title: String,
-        @JsonProperty("animeType") val type: String,
+        @JsonProperty("animeTitle") val title: String?,
+        @JsonProperty("title") val title2: String?,
+        @JsonProperty("animeType") val type: String?,
+        @JsonProperty("type") val type2: String?,
         @JsonProperty("fullHd") val fullHD: Boolean,
-        @JsonProperty("animeVerticalImages") val posters: List<ApiPoster>
+        @JsonProperty("animeVerticalImages") val posters: List<ApiPoster>?,
+        @JsonProperty("verticalImages") val posters2: List<ApiPoster>?
     )
 
     data class ApiSearchResult(
@@ -107,6 +111,7 @@ class AniPlayProvider : MainAPI() {
         @JsonProperty("status") val status: String,
         @JsonProperty("genres") val genres: List<ApiGenres>,
         @JsonProperty("verticalImages") val posters: List<ApiPoster>,
+        @JsonProperty("horizontalImages") val horizontalPosters: List<ApiPoster>,
         @JsonProperty("listWebsites") val websites: List<ApiWebsite>,
         @JsonProperty("episodes") val episodes: List<ApiEpisode>,
         @JsonProperty("seasons") val seasons: List<ApiSeason>?
@@ -115,23 +120,29 @@ class AniPlayProvider : MainAPI() {
     data class ApiEpisodeUrl(
         @JsonProperty("videoUrl") val url: String
     )
+    override val mainPage = mainPageOf(
+        Pair("$mainUrl/api/home/latest-episodes?page=", "Ultime uscite"),
+        Pair("$mainUrl/api/anime/advanced-search?size=36&sort=views,desc&sort=id&page=", "I più popolari"),
+        )
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
 
-    override suspend fun getMainPage(page: Int, request : MainPageRequest): HomePageResponse {
-        val response = parseJson<List<ApiMainPageAnime>>(app.get("$mainUrl/api/home/latest-episodes?page=0").text)
+        val response = parseJson<List<ApiMainPageAnime>>(app.get(request.data + page).text)
 
         val results = response.map{
-            val isDub = isDub(it.title)
+            val title = it.title?:it.title2!!
+            val isDub = isDub(title)
+            val id = if (it.id == 0) it.id2 else it.id
             newAnimeSearchResponse(
-                name = if (isDub) it.title.replace(dubIdentifier, "") else it.title,
-                url = "$mainUrl/api/anime/${it.id}",
-                type = getType(it.type),
+                name = if (isDub) title.replace(dubIdentifier, "") else title,
+                url = "$mainUrl/api/anime/$id",
+                type = getType(it.type?:it.type2),
             ){
                 addDubStatus(isDub, it.episode?.toIntOrNull())
-                this.posterUrl = it.posters.first().posterUrl
+                this.posterUrl = (it.posters?:it.posters2!!).first().posterUrl
                 this.quality = if (it.fullHD) SearchQuality.HD else null
             }
         }
-        return HomePageResponse(listOf(HomePageList("Ultime uscite",results)))
+        return newHomePageResponse(request.name, results)
     }
 
     override suspend fun quickSearch(query: String): List<SearchResponse>? {
@@ -185,7 +196,7 @@ class AniPlayProvider : MainAPI() {
             this.plot = response.plot
             this.tags = tags
             this.showStatus = getStatus(response.status)
-            addPoster(response.posters.first().posterUrl)
+            addPoster(response.horizontalPosters.first().posterUrl)
             addEpisodes(if (isDub) DubStatus.Dubbed else DubStatus.Subbed, episodes)
             addMalId(malId)
             addAniListId(aniListId)
@@ -202,22 +213,6 @@ class AniPlayProvider : MainAPI() {
 
         val episode = parseJson<ApiEpisodeUrl>(app.get(data).text)
 
-        if(episode.url.contains(".m3u8")){
-            val m3u8Helper = M3u8Helper()
-            val streams = m3u8Helper.m3u8Generation(M3u8Helper.M3u8Stream(episode.url,Qualities.Unknown.value), false)
-
-            streams.forEach {
-                callback.invoke(
-                    ExtractorLink(
-                        name,
-                        name,
-                        it.streamUrl,
-                        referer = mainUrl,
-                        quality = it.quality ?: Qualities.Unknown.value,
-                        isM3u8 = it.streamUrl.contains(".m3u8"))) }
-            return true
-        }
-
         callback.invoke(
             ExtractorLink(
                 name,
@@ -225,7 +220,7 @@ class AniPlayProvider : MainAPI() {
                 episode.url,
                 referer = mainUrl,
                 quality = Qualities.Unknown.value,
-                isM3u8 = false,
+                isM3u8 = episode.url.contains(".m3u8"),
             )
         )
         return true
