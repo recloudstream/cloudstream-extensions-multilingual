@@ -167,7 +167,8 @@ class AnimeWorldProvider : MainAPI() {
         @JsonProperty("link") val link: String,
         @JsonProperty("animeTypeName") val type: String,
         @JsonProperty("language") val language: String,
-        @JsonProperty("jtitle") val otherTitle: String
+        @JsonProperty("jtitle") val otherTitle: String,
+        @JsonProperty("identifier") val id: String
     )
 
     override suspend fun quickSearch(query: String): List<SearchResponse>? {
@@ -183,7 +184,7 @@ class AnimeWorldProvider : MainAPI() {
                 "it" -> true
                 else -> false
             }
-            newAnimeSearchResponse(anime.name, anime.link, type) {
+            newAnimeSearchResponse(anime.name, "$mainUrl/play/${anime.link}.${anime.id}", type) {
                 addDubStatus(dub)
                 this.otherName = anime.otherTitle
                 this.posterUrl = anime.image
