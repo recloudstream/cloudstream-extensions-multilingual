@@ -129,7 +129,7 @@ class AniPlayProvider : MainAPI() {
         val response = parseJson<List<ApiMainPageAnime>>(app.get(request.data + page).text)
 
         val results = response.map{
-            val title = it.title?:it.title2!!
+            val title = it.title?:it.title2?: return@mapNotNull null
             val isDub = isDub(title)
             val id = if (it.id == 0) it.id2 else it.id
             newAnimeSearchResponse(
@@ -196,7 +196,7 @@ class AniPlayProvider : MainAPI() {
             this.plot = response.plot
             this.tags = tags
             this.showStatus = getStatus(response.status)
-            addPoster(response.horizontalPosters.first().posterUrl)
+            addPoster(response.horizontalPosters.firstOrNull().posterUrl)
             addEpisodes(if (isDub) DubStatus.Dubbed else DubStatus.Subbed, episodes)
             addMalId(malId)
             addAniListId(aniListId)

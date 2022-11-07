@@ -8,7 +8,7 @@ import com.lagradost.cloudstream3.utils.loadExtractor
 
 class GuardaSerieProvider : MainAPI() {
     override var lang = "it"
-    override var mainUrl = "https://guardaserie.baby"
+    override var mainUrl = "https://guardaserie.app"
     override var name = "GuardaSerie"
     override val hasMainPage = true
     override val hasChromecastSupport = true

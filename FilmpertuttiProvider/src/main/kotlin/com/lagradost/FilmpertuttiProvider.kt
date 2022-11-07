@@ -25,20 +25,19 @@ class FilmpertuttiProvider : MainAPI() {
         TvType.TvSeries
     )
     override var sequentialMainPage = true
-    override var sequentialMainPageDelay: Long = 200
+    override var sequentialMainPageDelay: Long = 50
     override val mainPage = mainPageOf(
         Pair("$mainUrl/category/film/page/", "Film Popolari"),
         Pair("$mainUrl/category/serie-tv/page/", "Serie Tv Popolari"),
         Pair("$mainUrl/prime-visioni/", "Ultime uscite")
     )
 
-    private val interceptor = CloudflareKiller()
     override suspend fun getMainPage(
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
         val url = request.data + page
-        val soup = app.get(url, interceptor = interceptor, referer = mainUrl).document
+        val soup = app.get(url).document
         val home = soup.select("ul.posts > li").map {
             val title = it.selectFirst("div.title")!!.text().substringBeforeLast("(")
                 .substringBeforeLast("[")
@@ -65,7 +64,7 @@ class FilmpertuttiProvider : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         val queryformatted = query.replace(" ", "+")
         val url = "$mainUrl/?s=$queryformatted"
-        val doc = app.get(url, interceptor = interceptor).document 
+        val doc = app.get(url).document
         return doc.select("ul.posts > li").map {
             val title = it.selectFirst("div.title")!!.text().substringBeforeLast("(")
                 .substringBeforeLast("[")
@@ -84,7 +83,7 @@ class FilmpertuttiProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val document = app.get(url, interceptor = interceptor).document
+        val document = app.get(url).document
         val type =
             if (document.selectFirst("a.taxonomy.category")!!.attr("href").contains("serie-tv")
                     .not()
@@ -92,10 +91,8 @@ class FilmpertuttiProvider : MainAPI() {
         val title = document.selectFirst("#content > h1")!!.text().substringBeforeLast("(")
             .substringBeforeLast("[")
 
-        val description =
-            document.selectFirst("i.fa.fa-file-text-o.fa-fw")?.parent()?.nextSibling()?.toString()
-                ?.html().toString()
-
+        val descriptionindex = document.select("div.meta > div > div").indexOfFirst { it.getElementsContainingText("Trama").isNotEmpty() }
+        val description = document.select("div.meta > div > div")[descriptionindex +1].text()
 
         val rating = document.selectFirst("div.rating > div.value")?.text()
 
@@ -107,8 +104,10 @@ class FilmpertuttiProvider : MainAPI() {
                     ?.nextSibling() as Element?)?.text()?.substringAfterLast(" ")
                     ?.filter { it.isDigit() }?.toIntOrNull()
 
-
-        val poster = document.selectFirst("div.meta > div > img")?.attr("data-src")
+        val horizontalPosterData = document.selectFirst("body > main")?.attr("style")?:""
+        val poster =
+            Regex("url\\('(.*)'").find(horizontalPosterData)?.groups?.lastOrNull()?.value?:
+            document.selectFirst("div.meta > div > img")?.attr("src")
 
 
         val trailerurl =

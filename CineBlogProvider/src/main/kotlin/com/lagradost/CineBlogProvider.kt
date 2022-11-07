@@ -7,7 +7,7 @@ import com.lagradost.cloudstream3.utils.loadExtractor
 
 class CineBlogProvider : MainAPI() {
     override var lang = "it"
-    override var mainUrl = "https://cb01.rip"
+    override var mainUrl = "https://cb01.li"
     override var name = "CB01"
     override val hasMainPage = true
     override val hasChromecastSupport = true
@@ -79,7 +79,9 @@ class CineBlogProvider : MainAPI() {
             year = year.dropLast(4)
         }
 
-        val poster = document.selectFirst("div.poster > img")!!.attr("src")
+        val poster = 
+            document.selectFirst("#dt_galery")?.selectFirst("a")?.attr("href")?.trim()?:
+            document.selectFirst("div.poster > img")!!.attr("src")
 
         val recomm = document.select("#single_relacionados >article").map {
             val href = it.selectFirst("a")!!.attr("href")
