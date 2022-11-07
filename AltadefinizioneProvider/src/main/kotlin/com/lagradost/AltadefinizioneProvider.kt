@@ -52,8 +52,7 @@ class AltadefinizioneProvider : MainAPI() {
             "$mainUrl/index.php", data = mapOf(
                 "do" to "search",
                 "subaction" to "search",
-                "story" to query,
-                "sortby" to "news_read"
+                "story" to query
             )
         ).document
         return doc.select("div.box").map {
