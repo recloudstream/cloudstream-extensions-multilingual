@@ -52,7 +52,7 @@ class FilmanProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val url = "$mainUrl/wyszukiwarka?phrase=$query"
+        val url = "$mainUrl/item?phrase=$query"
         val document = app.get(url).document
         val lists = document.select("#advanced-search > div")
         val movies = lists[1].select("#item-list > div:not(.clearfix)")
