@@ -9,7 +9,7 @@ import com.lagradost.cloudstream3.utils.AppUtils.html
 
 class AltadefinizioneProvider : MainAPI() {
     override var lang = "it"
-    override var mainUrl = "https://altadefinizione.camera"
+    override var mainUrl = "https://altadefinizione.audio"
     override var name = "Altadefinizione"
     override val hasMainPage = true
     override val hasChromecastSupport = true

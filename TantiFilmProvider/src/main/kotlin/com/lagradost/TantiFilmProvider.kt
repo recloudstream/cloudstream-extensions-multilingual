@@ -9,7 +9,7 @@ import com.lagradost.cloudstream3.network.CloudflareKiller
 
 class TantifilmProvider : MainAPI() {
     override var lang = "it"
-    override var mainUrl = "https://tantifilm.tattoo"
+    override var mainUrl = "https://tantifilm.delivery"
     override var name = "Tantifilm"
     override val hasMainPage = true
     override val hasChromecastSupport = true
