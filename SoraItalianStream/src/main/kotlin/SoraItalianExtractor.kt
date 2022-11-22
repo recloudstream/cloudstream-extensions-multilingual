@@ -1,6 +1,5 @@
 package com.lagradost
 
-import com.lagradost.AniPlayProvider
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
@@ -289,7 +288,7 @@ object SoraItalianExtractor : SoraItalianStream() {
                 val episodeData = episodesData?.find {  it.number == episode.toString()  }?.id
                 if (episodeData != null) {
                     val streamUrl =
-                        parseJson<AniPlayProvider.ApiEpisodeUrl>(app.get("$aniplayUrl/api/episode/${episodeData}").text).url
+                        parseJson<AniPlayApiEpisodeUrl>(app.get("$aniplayUrl/api/episode/${episodeData}").text).url
                     callback.invoke(
                         ExtractorLink(
                             name,

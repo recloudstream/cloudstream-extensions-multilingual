@@ -1,17 +1,17 @@
 package com.lagradost
 
 import com.fasterxml.jackson.annotation.JsonProperty
-import com.lagradost.SoraItalian.SoraItalianExtractor.invoGuardare
+import com.lagradost.SoraItalianExtractor.invoGuardare
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.metaproviders.TmdbProvider
-import com.lagradost.SoraItalian.SoraItalianExtractor.invoAltadefinizione
-import com.lagradost.SoraItalian.SoraItalianExtractor.invoAniPlay
-import com.lagradost.SoraItalian.SoraItalianExtractor.invoAnimeSaturn
-import com.lagradost.SoraItalian.SoraItalianExtractor.invoAnimeWorld
-import com.lagradost.SoraItalian.SoraItalianExtractor.invoCb01
-import com.lagradost.SoraItalian.SoraItalianExtractor.invoFilmpertutti
-import com.lagradost.SoraItalian.SoraItalianExtractor.invoGuardaserie
+import com.lagradost.SoraItalianExtractor.invoAltadefinizione
+import com.lagradost.SoraItalianExtractor.invoAniPlay
+import com.lagradost.SoraItalianExtractor.invoAnimeSaturn
+import com.lagradost.SoraItalianExtractor.invoAnimeWorld
+import com.lagradost.SoraItalianExtractor.invoCb01
+import com.lagradost.SoraItalianExtractor.invoFilmpertutti
+import com.lagradost.SoraItalianExtractor.invoGuardaserie
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.AppUtils.toJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
