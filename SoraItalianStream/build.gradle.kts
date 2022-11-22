@@ -3,7 +3,7 @@ version = 1
 
 
 cloudstream {
-    language = "es"
+    language = "it"
     // All of these properties are optional, you can safely remove them
 
     description = "Provider che utilizza tmdb. Non tutti i links sono funzionanti"
