@@ -1,15 +1,19 @@
 package com.lagradost
 
+import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.AppUtils.toJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.nicehttp.RequestBodyTypes
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.InputStream
+import java.util.UUID
 
 class TvItalianaProvider : MainAPI() {
     override var lang = "it"
-    override var mainUrl = "https://raw.githubusercontent.com/Tundrak/IPTV-Italia/main/iptvitaplus.m3u"
     override var name = "TvItaliana"
     override val hasMainPage = true
     override val hasChromecastSupport = true
@@ -21,29 +25,85 @@ class TvItalianaProvider : MainAPI() {
         page: Int,
         request : MainPageRequest
     ): HomePageResponse {
-        val data = IptvPlaylistParser().parseM3U(app.get(mainUrl).text)
-        return HomePageResponse(data.items.groupBy{it.attributes["group-title"]}.map { group ->
-            val title = group.key ?: ""
-            val show = group.value.map { channel ->
-                val streamurl = channel.url.toString()
-                val channelname = channel.title.toString()
-                val posterurl = channel.attributes["tvg-logo"].toString()
-                val nation = channel.attributes["group-title"].toString()
+        val iptvUrl = "https://raw.githubusercontent.com/Tundrak/IPTV-Italia/main/iptvitaplus.m3u"
+        val data = IptvPlaylistParser().parseM3U(app.get(iptvUrl).text)
+        val res =  data.items.groupBy{it.attributes["group-title"]}.map { group ->
+                val title = group.key ?: ""
+                val show = group.value.map { channel ->
+                    val streamurl = channel.url.toString()
+                    val channelname = channel.title.toString()
+                    val posterurl = channel.attributes["tvg-logo"].toString()
+                    val nation = channel.attributes["group-title"].toString()
+                    LiveSearchResponse(
+                        channelname,
+                        LoadData(streamurl, channelname, posterurl, nation, false).toJson(),
+                        this@TvItalianaProvider.name,
+                        TvType.Live,
+                        posterurl,
+                        lang = "ita"
+                    )
+                }
+                HomePageList(
+                    title,
+                    show,
+                    isHorizontalImages = true
+                )
+            }.toMutableList()
+
+        val skyStreams = listOf(7,2,1).map{ n ->
+           app.get("https://apid.sky.it/vdp/v1/getLivestream?id=$n").parsedSafe<LivestreamResponse>()}
+
+        val shows = skyStreams.map {
+            val posterUrl = when (it?.title){
+                "MTV8" -> "https://upload.wikimedia.org/wikipedia/commons/b/ba/MTV8_logo.jpg"
+                else -> "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/Sky_italia_2018.png/640px-Sky_italia_2018.png"
+            }
+            LiveSearchResponse(
+                it?.title!!,
+                LoadData(it.streamingUrl!!, it.title!!, posterUrl, "", false).toJson(),
+                this@TvItalianaProvider.name,
+                TvType.Live,
+                posterUrl,
+                lang = "ita"
+            )
+        }
+        res.add(
+            HomePageList(
+                "sky italia",
+                shows,
+                isHorizontalImages = true
+            )
+        )
+
+        val domain = "https://" + app.get("https://prod-realmservice.mercury.dnitv.com/realm-config/www.discoveryplus.com%2Fit%2Fepg").parsedSafe<DomainDiscovery>()?.domain
+        val deviceId = UUID.randomUUID().toString().replace("-","")
+        val cookies = app.get("$domain/token?deviceId=$deviceId&realm=dplay&shortlived=true").cookies
+        val streamDatas = app.get("$domain/cms/routes/home?include=default&decorators=playbackAllowed", cookies = cookies).parsedSafe<DataDiscovery>()?.included
+        val posterValues = streamDatas?.filter { it.type == "image" }
+            ?.map { it.id to it.attributes?.src }
+        val discoveryinfo = streamDatas?.filter { it.type == "channel" && it.attributes?.hasLiveStream == true && it.attributes.packages?.contains("Free") ?: false  }
+            ?.map { streamInfo ->
+                val posterUrl = posterValues?.find { it.first == streamInfo.relationships?.images?.data?.first()?.id }?.second!!
                 LiveSearchResponse(
-                    channelname,
-                    LoadData(streamurl, channelname, posterurl, nation).toJson(),
+                    streamInfo.attributes?.name!!,
+                    LoadData(streamInfo.id, streamInfo.attributes.name, posterUrl, streamInfo.attributes.longDescription!!, true).toJson(),
                     this@TvItalianaProvider.name,
                     TvType.Live,
-                    posterurl,
+                    posterUrl,
                     lang = "ita"
                 )
             }
+        res.add(
             HomePageList(
-                title,
-                show,
+                "Discovery",
+                discoveryinfo!!,
                 isHorizontalImages = true
             )
-        })
+        )
+
+        return HomePageResponse(res)
+
+
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
@@ -56,7 +116,7 @@ class TvItalianaProvider : MainAPI() {
             val nation = channel.attributes["group-title"].toString()
             LiveSearchResponse(
                 channelname,
-                LoadData(streamurl, channelname, posterurl, nation).toJson(),
+                LoadData(streamurl, channelname, posterurl, nation,false).toJson(),
                 this@TvItalianaProvider.name,
                 TvType.Live,
                 posterurl,
@@ -66,20 +126,22 @@ class TvItalianaProvider : MainAPI() {
 
     override suspend fun load(url: String): LoadResponse {
         val data = parseJson<LoadData>(url)
+
         return LiveStreamLoadResponse(
             data.title,
             data.url,
             this.name,
             url,
             data.poster,
-            plot = data.nation
+            plot = data.plot
         )
     }
     data class LoadData(
         val url: String,
         val title: String,
         val poster: String,
-        val nation: String
+        val plot: String,
+        val discoveryBoolean: Boolean
 
     )
     override suspend fun loadLinks(
@@ -88,26 +150,97 @@ class TvItalianaProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+
+
         val loadData = parseJson<LoadData>(data)
-        callback.invoke(
-            ExtractorLink(
-                this.name,
-                loadData.title,
-                loadData.url,
-                "",
-                Qualities.Unknown.value,
-                isM3u8 = true
+
+        if (!loadData.discoveryBoolean) {
+            callback.invoke(
+                ExtractorLink(
+                    this.name,
+                    loadData.title,
+                    loadData.url,
+                    "",
+                    Qualities.Unknown.value,
+                    isM3u8 = true
+                )
             )
-        )
+        }
+        else{
+            val domain = "https://" + app.get("https://prod-realmservice.mercury.dnitv.com/realm-config/www.discoveryplus.com%2Fit%2Fepg").parsedSafe<DomainDiscovery>()?.domain
+            val deviceId = UUID.randomUUID().toString()
+            val cookies = app.get("$domain/token?deviceId=$deviceId&realm=dplay&shortlived=true").cookies
+
+            val post = PostData(loadData.url, DeviceInfo(ad = false, dmr = true)).toJson()
+            val data = app.post("$domain/playback/v3/channelPlaybackInfo", requestBody = post.toRequestBody(
+                RequestBodyTypes.JSON.toMediaTypeOrNull()), cookies = cookies).text.substringAfter("\"url\" : \"").substringBefore("\"")
+            callback.invoke(
+                ExtractorLink(
+                    this.name,
+                    loadData.title,
+                    data,
+                    "",
+                    Qualities.Unknown.value,
+                    isM3u8 = true
+                )
+            )
+        }
         return true
     }
+    data class PostData(
+        @JsonProperty("channelId") val id: String,
+        @JsonProperty("deviceInfo") val deviceInfo : DeviceInfo
+    )
+    data class DeviceInfo(
+        @JsonProperty("drmSupported") val dmr : Boolean,
+        @JsonProperty("adBlocker") val ad: Boolean,
+    )
+    data class DomainDiscovery(
+        @JsonProperty("domain") val domain: String,
+    )
+    data class DataDiscovery(
+        val included: List<Included>? = null
+    )
+
+    data class Included(
+        val attributes: IncludedAttributes? = null,
+        val id: String,
+        val relationships : IncludedRelationships? = null,
+        val type: String
+    )
+
+    data class IncludedRelationships(
+         val images: ImagesData? = null
+    )
+
+    data class ImagesData (
+        val data: List<DAT>? = null
+    )
+    data class DAT (
+        val id: String? = null,
+    )
+
+
+    data class IncludedAttributes(
+        val name: String?,
+        val hasLiveStream : Boolean?,
+        val packages: List<String>?,
+        val longDescription: String?,
+        val src: String?
+    )
+
 }
 
 
 data class Playlist(
     val items: List<PlaylistItem> = emptyList(),
 )
+data class LivestreamResponse(
+    @JsonProperty("channel") val channel: String? = null,
+    @JsonProperty("title") val title: String? = null,
+    @JsonProperty("streaming_url") val streamingUrl: String? = null,
 
+)
 data class PlaylistItem(
     val title: String? = null,
     val attributes: Map<String, String> = emptyMap(),
