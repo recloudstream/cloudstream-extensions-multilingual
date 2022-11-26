@@ -8,5 +8,5 @@ cloudstream {
 
     tvTypes = listOf( "Live" )
 
-    iconUrl = "https://www.google.com/s2/favicons?domain=9goaltv.to&sz=%size%"
+    iconUrl = "https://media.discordapp.net/attachments/1027568249900109875/1046110428402561025/JK8J1KX.png?width=182&height=182"
 }
