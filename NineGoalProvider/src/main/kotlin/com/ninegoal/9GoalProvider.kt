@@ -68,10 +68,6 @@ class NineGoal : MainAPI() {
         TvType.Live
     )
 
-    private fun String.getDomainFromUrl(): String? {
-        return Regex("""^(?:https?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:\/\n\?\=]+)""").find(this)?.groupValues?.firstOrNull()
-    }
-
     override suspend fun getMainPage(page: Int, request : MainPageRequest): HomePageResponse {
         val doc = app.get(mainUrl).document
         val apiUrl = doc.select("head > script").first()?.html()?.substringAfter("window.api_base_url = \"")?.substringBefore("\";")
@@ -124,7 +120,7 @@ class NineGoal : MainAPI() {
                     this.name,
                     "${this.name} ${it.name} - ${sourcesData.name}",
                     it.url.toString(),
-                    fixUrl(it.url?.getDomainFromUrl().toString()),
+                    "$mainUrl/",
                     Qualities.Unknown.value,
                     isM3u8 = true,
                 )
