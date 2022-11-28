@@ -124,7 +124,7 @@ class NineGoal : MainAPI() {
                     else -> Qualities.Unknown.value
                 }
             }
-            val language = it.name?.replace(" (${it.name?.substringAfter("(")?.substringBefore(")")})", "") ?: ""
+            val language = it.name?.replace(" \(.*".toRegex(), "") ?: ""
             val brokenDomain = "canyou.letmestreamyou.net"
             if(it.url.toString().startsWith("https://$brokenDomain")) {
                 mapOf(
