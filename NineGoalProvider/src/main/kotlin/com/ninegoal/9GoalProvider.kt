@@ -75,7 +75,7 @@ class NineGoal : MainAPI() {
         val matchesData = parseJson<matchesJSON>(app.get("$apiUrl/v1/match/featured").text)
         val liveHomePageList = matchesData.data.filter { it.isLive == true }.map {
             LiveSearchResponse(
-                it.name.toString(),
+                it.name ?: "",
                 apiUrl + "/v1/match/" + it.id,
                 this@NineGoal.name,
                 TvType.Live,
@@ -84,7 +84,7 @@ class NineGoal : MainAPI() {
         }
         val featuredHomePageList = matchesData.data.filter { it.isLive == false }.map {
             LiveSearchResponse(
-                it.name.toString(),
+                it.name ?: "",
                 apiUrl + "/v1/match/" + it.id,
                 this@NineGoal.name,
                 TvType.Live,
@@ -102,7 +102,7 @@ class NineGoal : MainAPI() {
     override suspend fun load(url: String): LoadResponse {
         val json = parseJson<oneMatch>(app.get(url).text).data
         return LiveStreamLoadResponse(
-            json?.name.toString(),
+            json?.name ?: "",
             url,
             this.name,
             "$url/stream",
@@ -116,9 +116,15 @@ class NineGoal : MainAPI() {
     ): Boolean {
         val sourcesData = parseJson<sourcesJSON>(app.get(data).text).data
         sourcesData?.playUrls?.apmap {
-            var quality = it.name?.substringAfter("(")?.substringBefore(")").toString()
-            val language = it.name?.replace(" ($quality)", "").toString()
-            quality = (if(quality == "Full HD") 1080 else if(quality == "HD") 720 else if(quality == "SD") 480 else Qualities.Unknown.value).toString()
+            val quality = it.name?.substringAfter("(")?.substringBefore(")").let {
+                when (it) {
+                    "Full HD" -> 1080
+                    "HD" -> 720
+                    "SD" -> 480
+                    else -> Qualities.Unknown.value
+                }
+            }
+            val language = it.name?.replace(" (${it.name?.substringAfter("(")?.substringBefore(")")})", "") ?: ""
             val brokenDomain = "canyou.letmestreamyou.net"
             if(it.url.toString().startsWith("https://$brokenDomain")) {
                 mapOf(
@@ -132,9 +138,9 @@ class NineGoal : MainAPI() {
                         ExtractorLink(
                             this.name,
                             "$language - ${name}",
-                            it.url.toString().replace(brokenDomain, value),
+                            it.url?.replace(brokenDomain, value) ?: "",
                             "$mainUrl/",
-                            quality.toInt(),
+                            quality,
                             isM3u8 = true,
                         )
                     )
@@ -144,9 +150,9 @@ class NineGoal : MainAPI() {
                     ExtractorLink(
                         this.name,
                         "$language - ${sourcesData.name}",
-                        it.url.toString(),
+                        it.url ?: "",
                         "$mainUrl/",
-                        quality.toInt(),
+                        quality,
                         isM3u8 = true,
                     )
                 )
