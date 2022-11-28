@@ -116,16 +116,17 @@ class NineGoal : MainAPI() {
     ): Boolean {
         val sourcesData = parseJson<sourcesJSON>(app.get(data).text).data
         sourcesData?.playUrls?.apmap {
-            val quality = it.name?.substringAfter("(")?.substringBefore(")").toString()
-            val language = it.name?.replace("($quality)", "").toString()
+            var quality = it.name?.substringAfter("(")?.substringBefore(")").toString()
+            val language = it.name?.replace(" ($quality)", "").toString()
+            quality = (if(quality == "Full HD") 1080 else if(quality == "HD") 720 else if(quality == "SD") 480 else Qualities.Unknown.value).toString()
             val brokenDomain = "canyou.letmestreamyou.net"
             if(it.url.toString().startsWith("https://$brokenDomain")) {
                 mapOf(
-                    "Domain (1)" to "playing.smoothlikebutterstream.com",
-                    "Domain (2)" to "playing.tunnelcdnsw.net",
-                    "Domain (3)" to "playing.goforfreedomwme.net",
-                    "Domain (4)" to "turnthe.gameon.tel",
-                    "Domain (5)" to "playing.whydontyoustreamwme.com"
+                    "Domain ( 1 )" to "playing.smoothlikebutterstream.com",
+                    "Domain ( 2 )" to "playing.tunnelcdnsw.net",
+                    "Domain ( 3 )" to "playing.goforfreedomwme.net",
+                    "Domain ( 4 )" to "turnthe.gameon.tel",
+                    "Domain ( 5 )" to "playing.whydontyoustreamwme.com"
                 ).apmap { (name, value) ->
                     callback.invoke(
                         ExtractorLink(
@@ -133,7 +134,7 @@ class NineGoal : MainAPI() {
                             "$language - ${name}",
                             it.url.toString().replace(brokenDomain, value),
                             "$mainUrl/",
-                            if(quality == "Full HD") 1080 else if(quality == "HD") 720 else if(quality == "SD") 480 else Qualities.Unknown.value,
+                            quality.toInt(),
                             isM3u8 = true,
                         )
                     )
@@ -145,7 +146,7 @@ class NineGoal : MainAPI() {
                         "$language - ${sourcesData.name}",
                         it.url.toString(),
                         "$mainUrl/",
-                        if(quality == "Full HD") 1080 else if(quality == "HD") 720 else if(quality == "SD") 480 else Qualities.Unknown.value,
+                        quality.toInt(),
                         isM3u8 = true,
                     )
                 )
