@@ -141,7 +141,7 @@ class NineGoal : MainAPI() {
             } catch (e: UnknownHostException) {
                 false
             }
-            val domain = it.url?.getDomainFromUrl() ?: "canyou.letmestreamyou.net"
+            val domain = fixUrl(it.url?.getDomainFromUrl() ?: "https://canyou.letmestreamyou.net")
             if (!requestStatus) {
                     mapOf(
                         "(1)" to "https://playing.smoothlikebutterstream.com",
