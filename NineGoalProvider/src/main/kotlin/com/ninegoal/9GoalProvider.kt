@@ -5,6 +5,7 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.Qualities
+import java.net.UnknownHostException
 import java.util.*
 
 data class Data (
@@ -59,6 +60,10 @@ data class sourcesJSON (
     @JsonProperty("data" ) var data : sourceData? = sourceData()
 )
 
+private fun String.getDomainFromUrl(): String? {
+    return Regex("""^(?:https?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:\/\n\?\=]+)""").find(this)?.groupValues?.firstOrNull()
+}
+
 class NineGoal : MainAPI() {
     override var mainUrl = "https://9goaltv.to"
     override var name = "9Goal"
@@ -106,8 +111,10 @@ class NineGoal : MainAPI() {
             url,
             this.name,
             "$url/stream",
+            "https://img.zr5.repl.co/vs?title=${json?.name}&home=${json?.home?.logo}&away=${json?.away?.logo}&live=${json?.isLive}"
         )
     }
+
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -116,8 +123,8 @@ class NineGoal : MainAPI() {
     ): Boolean {
         val sourcesData = parseJson<sourcesJSON>(app.get(data).text).data
         sourcesData?.playUrls?.apmap {
-            val quality = it.name?.substringAfter("(")?.substringBefore(")").let {
-                when (it) {
+            val quality = it.name?.substringAfter("(")?.substringBefore(")").let { qualityText ->
+                when (qualityText) {
                     "Full HD" -> 1080
                     "HD" -> 720
                     "SD" -> 480
@@ -125,38 +132,47 @@ class NineGoal : MainAPI() {
                 }
             }
             val language = it.name?.replace(""" \(.*""".toRegex(), "") ?: ""
-            val brokenDomain = "letmestreamyou.net"
-            if(it.url.toString().contains(brokenDomain)) {
-                mapOf(
-                    "Domain ( 1 )" to "playing.smoothlikebutterstream.com",
-                    "Domain ( 2 )" to "playing.tunnelcdnsw.net",
-                    "Domain ( 3 )" to "playing.goforfreedomwme.net",
-                    "Domain ( 4 )" to "turnthe.gameon.tel",
-                    "Domain ( 5 )" to "playing.whydontyoustreamwme.com"
-                ).apmap { (name, value) ->
+            val requestStatus = try {
+                app.head(
+                    fixUrl(
+                        it.url?.getDomainFromUrl() ?: "canyou.letmestreamyou.net"
+                    )
+                ).isSuccessful
+            } catch (e: UnknownHostException) {
+                false
+            }
+            val domain = it.url?.getDomainFromUrl() ?: "canyou.letmestreamyou.net"
+            if (!requestStatus) {
+                    mapOf(
+                        "(1)" to "https://playing.smoothlikebutterstream.com",
+                        "(2)" to "https://playing.tunnelcdnsw.net",
+                        "(3)" to "https://playing.goforfreedomwme.net",
+                        "(4)" to "https://turnthe.gameon.tel",
+                        "(5)" to "https://playing.whydontyoustreamwme.com"
+                    ).apmap { (name, value) ->
+                        callback.invoke(
+                            ExtractorLink(
+                                this.name,
+                                "$language - $name",
+                                it.url?.replace(domain, value) ?: "",
+                                "$mainUrl/",
+                                quality,
+                                isM3u8 = true,
+                            )
+                        )
+                    }
+                } else {
                     callback.invoke(
                         ExtractorLink(
                             this.name,
-                            "$language - ${name}",
-                            it.url?.replace(brokenDomain, value) ?: "",
+                            "$language - ${sourcesData.name}",
+                            it.url ?: "",
                             "$mainUrl/",
                             quality,
                             isM3u8 = true,
                         )
                     )
                 }
-            } else {
-                callback.invoke(
-                    ExtractorLink(
-                        this.name,
-                        "$language - ${sourcesData.name}",
-                        it.url ?: "",
-                        "$mainUrl/",
-                        quality,
-                        isM3u8 = true,
-                    )
-                )
-            }
         }
         return true
     }
