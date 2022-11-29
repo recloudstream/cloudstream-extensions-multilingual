@@ -37,8 +37,8 @@ class EurostreamingProvider : MainAPI() {
     }
 
     private fun Element.toSearchResult(): SearchResponse {
-        val title = this.selectFirst("a")?.attr("title").toString()
-        val link = this.selectFirst("a")?.attr("href").toString()
+        val title = this.selectFirst("a")?.attr("title")
+        val link = this.selectFirst("a")?.attr("href")
         val image = fixUrlNull(mainUrl + this.selectFirst("img")?.attr("src")?.trim())
 
         return newTvSeriesSearchResponse(title, link, TvType.TvSeries){
