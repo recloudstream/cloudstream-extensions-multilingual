@@ -8,7 +8,6 @@ import com.lagradost.cloudstream3.utils.AppUtils.toJson
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import okhttp3.FormBody
 import org.jsoup.nodes.Element
-import android.util.Log
 
 class EurostreamingProvider : MainAPI() {
     override var lang = "it"
@@ -61,8 +60,8 @@ class EurostreamingProvider : MainAPI() {
             interceptor = interceptor
             ).document
 
-        return doc.select("div.post-thumb").map {
-            it.toSearchResult()
+        return doc.select("div.post-thumb").mapNotNull {
+            it?.toSearchResult()
         }
     }
 
