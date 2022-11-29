@@ -1,15 +1,18 @@
 package com.lagradost
 
 import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
+import com.lagradost.cloudstream3.LoadResponse.Companion.addRating
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
-import com.lagradost.cloudstream3.utils.AppUtils.html
+import okhttp3.FormBody
+import org.jsoup.nodes.Element
 
 
 class AltadefinizioneProvider : MainAPI() {
     override var lang = "it"
-    override var mainUrl = "https://altadefinizione.audio"
+    override var mainUrl = "https://altadefinizione.navy"
     override var name = "Altadefinizione"
     override val hasMainPage = true
     override val hasChromecastSupport = true
@@ -25,108 +28,75 @@ class AltadefinizioneProvider : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = request.data + page
-
         val soup = app.get(url).document
-        val home = soup.select("div.box").map {
-            val title = it.selectFirst("img")!!.attr("alt")
-            val link = it.selectFirst("a")!!.attr("href")
-            val image = mainUrl + it.selectFirst("img")!!.attr("src")
-            val quality = getQualityFromString(it.selectFirst("span")!!.text())
-
-            MovieSearchResponse(
-                title,
-                link,
-                this.name,
-                TvType.Movie,
-                image,
-                null,
-                null,
-                quality,
-            )
+        val home = soup.select("div.box").mapNotNull {
+            it.toSearchResult()
         }
-        return newHomePageResponse(request.name, home)
+        return newHomePageResponse(arrayListOf(HomePageList(request.name, home)), hasNext = true)
+    }
+
+    private fun Element.toSearchResult(): SearchResponse? {
+        val title = this.selectFirst("img")?.attr("alt") ?: return null
+        val link = this.selectFirst("a")?.attr("href") ?: return null
+        val image = mainUrl + this.selectFirst("img")?.attr("src")
+        val quality = getQualityFromString(this.selectFirst("span")?.text())
+        return newMovieSearchResponse(title, link, TvType.Movie) {
+            this.posterUrl = image
+            this.quality = quality
+        }
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
+        val body = FormBody.Builder()
+            .addEncoded("do", "search")
+            .addEncoded("subaction", "search")
+            .addEncoded("story", query)
+            .addEncoded("sortby", "news_read")
+            .build()
         val doc = app.post(
-            "$mainUrl/index.php", data = mapOf(
-                "do" to "search",
-                "subaction" to "search",
-                "story" to query
-            )
+            "$mainUrl/index.php",
+            requestBody = body
         ).document
-        return doc.select("div.box").map {
-            val title = it.selectFirst("img")!!.attr("alt")
-            val link = it.selectFirst("a")!!.attr("href")
-            val image = mainUrl + it.selectFirst("img")!!.attr("src")
-            val quality = getQualityFromString(it.selectFirst("span")!!.text())
 
-            MovieSearchResponse(
-                title,
-                link,
-                this.name,
-                TvType.Movie,
-                image,
-                null,
-                null,
-                quality,
-            )
+        return doc.select("div.box").mapNotNull {
+            it.toSearchResult()
         }
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val page = app.get(url)
-        val document = page.document
-        val title = document.selectFirst(" h1 > a")!!.text().replace("streaming", "")
-        val description = document.select("#sfull").toString().substringAfter("altadefinizione")
-            .substringBeforeLast("fonte trama").html().toString()
-        val rating = null
+        val document = app.get(url).document
 
-        val year = document.selectFirst("#details > li:nth-child(2)")!!.childNode(2).toString()
-            .filter { it.isDigit() }.toInt()
-
-        val poster = fixUrl(document.selectFirst("div.thumbphoto > img")!!.attr("src"))
-
-        val recomm = document.select("ul.related-list > li").map {
-            val href = it.selectFirst("a")!!.attr("href")
-            val posterUrl = mainUrl + it.selectFirst("img")!!.attr("src")
-            val name = it.selectFirst("img")!!.attr("alt")
-            MovieSearchResponse(
-                name,
-                href,
-                this.name,
-                TvType.Movie,
-                posterUrl,
-                null
-            )
-
+        val title = document.selectFirst(" h1 > a")?.text()?.replace("streaming", "")
+            ?: throw ErrorLoadingException("No Title found")
+        val description = document.select("#sfull").textNodes().first { it.text().trim().isNotEmpty() }.text().trim()
+        val rating = document.select("span.rateIMDB").text().substringAfter(" ")
+        val year = document.selectFirst("#details")?.select("li")
+            ?.firstOrNull { it.select("label").text().contains("Anno") }
+            ?.text()?.substringAfter(" ")?.toIntOrNull()
+        val poster = fixUrl(document.selectFirst("div.thumbphoto > img")?.attr("src")?: throw ErrorLoadingException("No Poster found") )
+        val recomm = document.select("ul.related-list > li").mapNotNull {
+            it.toSearchResult()
         }
-
-
-        val actors: List<ActorData> =
+        val actors: List<Actor> =
             document.select("#staring > a").map {
-                ActorData(actor = Actor(it.text()))
+                Actor(it.text())
             }
-
         val tags: List<String> = document.select("#details > li:nth-child(1) > a").map { it.text() }
-
-        val trailerurl = document.selectFirst("#showtrailer > div > div > iframe")?.attr("src")
-
+        val trailerUrl = document.selectFirst("#showtrailer > div > div > iframe")?.attr("src")
         return newMovieLoadResponse(
             title,
             url,
             TvType.Movie,
             url
         ) {
-            posterUrl = fixUrlNull(poster)
             this.year = year
             this.plot = description
-            this.rating = rating
             this.recommendations = recomm
-            this.duration = null
-            this.actors = actors
             this.tags = tags
-            addTrailer(trailerurl)
+            addActors(actors)
+            addPoster(poster)
+            addRating(rating)
+            addTrailer(trailerUrl)
         }
     }
 
@@ -152,7 +122,6 @@ class AltadefinizioneProvider : MainAPI() {
                 loadExtractor(fixUrl(it.attr("data-link")), data, subtitleCallback, callback)
             }
         }
-
         return true
     }
 }
