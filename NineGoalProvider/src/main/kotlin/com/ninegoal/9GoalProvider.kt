@@ -125,8 +125,8 @@ class NineGoal : MainAPI() {
                 }
             }
             val language = it.name?.replace(""" \(.*""".toRegex(), "") ?: ""
-            val brokenDomain = "canyou.letmestreamyou.net"
-            if(it.url.toString().startsWith("https://$brokenDomain")) {
+            val brokenDomain = "letmestreamyou.net"
+            if(it.url.toString().contains(brokenDomain)) {
                 mapOf(
                     "Domain ( 1 )" to "playing.smoothlikebutterstream.com",
                     "Domain ( 2 )" to "playing.tunnelcdnsw.net",
