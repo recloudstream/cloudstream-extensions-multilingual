@@ -144,11 +144,11 @@ class NineGoal : MainAPI() {
             }
             if (!requestStatus) {
                     mapOf(
-                        "(1)" to "https://playing.smoothlikebutterstream.com",
-                        "(2)" to "https://playing.tunnelcdnsw.net",
-                        "(3)" to "https://playing.goforfreedomwme.net",
-                        "(4)" to "https://turnthe.gameon.tel",
-                        "(5)" to "https://playing.whydontyoustreamwme.com"
+                        "(1)" to "playing.smoothlikebutterstream.com",
+                        "(2)" to "playing.tunnelcdnsw.net",
+                        "(3)" to "playing.goforfreedomwme.net",
+                        "(4)" to "turnthe.gameon.tel",
+                        "(5)" to "playing.whydontyoustreamwme.com"
                     ).apmap { (name, value) ->
                         callback.invoke(
                             ExtractorLink(
