@@ -5,6 +5,7 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.Qualities
+import java.net.UnknownHostException
 import java.util.*
 
 data class Data (
@@ -58,6 +59,11 @@ data class sourceData (
 data class sourcesJSON (
     @JsonProperty("data" ) var data : sourceData? = sourceData()
 )
+
+private fun String.getDomainFromUrl(): String? {
+    return Regex("""^(?:https?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:\/\n\?\=]+)""").find(this)?.groupValues?.firstOrNull()
+}
+
 class NineGoal : MainAPI() {
     override var mainUrl = "https://9goaltv.to"
     override var name = "9Goal"
@@ -74,7 +80,7 @@ class NineGoal : MainAPI() {
         val matchesData = parseJson<matchesJSON>(app.get("$apiUrl/v1/match/featured").text)
         val liveHomePageList = matchesData.data.filter { it.isLive == true }.map {
             LiveSearchResponse(
-                it.name.toString(),
+                it.name ?: "",
                 apiUrl + "/v1/match/" + it.id,
                 this@NineGoal.name,
                 TvType.Live,
@@ -83,7 +89,7 @@ class NineGoal : MainAPI() {
         }
         val featuredHomePageList = matchesData.data.filter { it.isLive == false }.map {
             LiveSearchResponse(
-                it.name.toString(),
+                it.name ?: "",
                 apiUrl + "/v1/match/" + it.id,
                 this@NineGoal.name,
                 TvType.Live,
@@ -101,12 +107,14 @@ class NineGoal : MainAPI() {
     override suspend fun load(url: String): LoadResponse {
         val json = parseJson<oneMatch>(app.get(url).text).data
         return LiveStreamLoadResponse(
-            json?.name.toString(),
+            json?.name ?: "",
             url,
             this.name,
             "$url/stream",
+            "https://img.zr5.repl.co/vs?title=${json?.name}&home=${json?.home?.logo}&away=${json?.away?.logo}&live=${json?.isLive}"
         )
     }
+
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -115,38 +123,56 @@ class NineGoal : MainAPI() {
     ): Boolean {
         val sourcesData = parseJson<sourcesJSON>(app.get(data).text).data
         sourcesData?.playUrls?.apmap {
-            val brokenDomain = "canyou.letmestreamyou.net"
-            if(it.url.toString().startsWith("https://$brokenDomain")) {
-                mapOf(
-                    "smoothlikebutterstream" to "playing.smoothlikebutterstream.com",
-                    "tunnelcdnsw" to "playing.tunnelcdnsw.net",
-                    "goforfreedomwme" to "playing.goforfreedomwme.net",
-                    "gameon" to "turnthe.gameon.tel",
-                    "whydontyoustreamwme" to "playing.whydontyoustreamwme.com"
-                ).apmap { (name, value) ->
+            val quality = it.name?.substringAfter("(")?.substringBefore(")").let { qualityText ->
+                when (qualityText) {
+                    "Full HD" -> 1080
+                    "HD" -> 720
+                    "SD" -> 480
+                    else -> Qualities.Unknown.value
+                }
+            }
+            val language = it.name?.replace(""" \(.*""".toRegex(), "") ?: ""
+            val requestStatus = try {
+                app.head(
+                    fixUrl(
+                        it.url?.getDomainFromUrl() ?: "canyou.letmestreamyou.net"
+                    )
+                ).isSuccessful
+            } catch (e: UnknownHostException) {
+                false
+            }
+            val domain = fixUrl(it.url?.getDomainFromUrl() ?: "https://canyou.letmestreamyou.net")
+            if (!requestStatus) {
+                    mapOf(
+                        "(1)" to "https://playing.smoothlikebutterstream.com",
+                        "(2)" to "https://playing.tunnelcdnsw.net",
+                        "(3)" to "https://playing.goforfreedomwme.net",
+                        "(4)" to "https://turnthe.gameon.tel",
+                        "(5)" to "https://playing.whydontyoustreamwme.com"
+                    ).apmap { (name, value) ->
+                        callback.invoke(
+                            ExtractorLink(
+                                this.name,
+                                "$language - $name",
+                                it.url?.replace(domain, value) ?: "",
+                                "$mainUrl/",
+                                quality,
+                                isM3u8 = true,
+                            )
+                        )
+                    }
+                } else {
                     callback.invoke(
                         ExtractorLink(
                             this.name,
-                            "${this.name} ${it.name} - ${name}",
-                            it.url.toString().replace(brokenDomain, value),
+                            "$language - ${sourcesData.name}",
+                            it.url ?: "",
                             "$mainUrl/",
-                            Qualities.Unknown.value,
+                            quality,
                             isM3u8 = true,
                         )
                     )
                 }
-            } else {
-                callback.invoke(
-                    ExtractorLink(
-                        this.name,
-                        "${this.name} ${it.name} - ${sourcesData.name}",
-                        it.url.toString(),
-                        "$mainUrl/",
-                        Qualities.Unknown.value,
-                        isM3u8 = true,
-                    )
-                )
-            }
         }
         return true
     }
