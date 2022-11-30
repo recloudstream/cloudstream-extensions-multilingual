@@ -5,6 +5,7 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.Qualities
+import java.net.URL
 import java.net.UnknownHostException
 import java.util.*
 
@@ -60,10 +61,6 @@ data class sourcesJSON (
     @JsonProperty("data" ) var data : sourceData? = sourceData()
 )
 
-private fun String.getDomainFromUrl(): String? {
-    return Regex("""^(?:https?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:\/\n\?\=]+)""").find(this)?.groupValues?.firstOrNull()
-}
-
 class NineGoal : MainAPI() {
     override var mainUrl = "https://9goaltv.to"
     override var name = "9Goal"
@@ -76,7 +73,10 @@ class NineGoal : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request : MainPageRequest): HomePageResponse {
         val doc = app.get(mainUrl).document
-        val apiUrl = doc.select("head > script").first()?.html()?.substringAfter("window.api_base_url = \"")?.substringBefore("\";")
+        val apiUrl = doc.select("head > script")
+            .firstOrNull { it.html().contains("window.api_base_url") }.let {
+            Regex("""window\.api_base_url = "(.*)";""").find(it?.html() ?: "")?.groupValues?.lastOrNull()
+        } ?: "https://justameanlessdomain.com"
         val matchesData = parseJson<matchesJSON>(app.get("$apiUrl/v1/match/featured").text)
         val liveHomePageList = matchesData.data.filter { it.isLive == true }.map {
             LiveSearchResponse(
@@ -131,30 +131,34 @@ class NineGoal : MainAPI() {
                     else -> Qualities.Unknown.value
                 }
             }
-            val language = it.name?.replace(""" \(.*""".toRegex(), "") ?: ""
+            val language = it.name?.replace("""\(.*""".toRegex(), "") ?: ""
+            val url = URL(it.url)
             val requestStatus = try {
                 app.head(
                     fixUrl(
-                        it.url?.getDomainFromUrl() ?: "canyou.letmestreamyou.net"
+                        it.url ?: ""
                     )
                 ).isSuccessful
             } catch (e: UnknownHostException) {
                 false
             }
+<<<<<<< Updated upstream
             val domain = fixUrl(it.url?.getDomainFromUrl() ?: "https://canyou.letmestreamyou.net")
+=======
+>>>>>>> Stashed changes
             if (!requestStatus) {
                     mapOf(
-                        "(1)" to "https://playing.smoothlikebutterstream.com",
-                        "(2)" to "https://playing.tunnelcdnsw.net",
-                        "(3)" to "https://playing.goforfreedomwme.net",
-                        "(4)" to "https://turnthe.gameon.tel",
-                        "(5)" to "https://playing.whydontyoustreamwme.com"
+                        "(1)" to "playing.smoothlikebutterstream.com",
+                        "(2)" to "playing.tunnelcdnsw.net",
+                        "(3)" to "playing.goforfreedomwme.net",
+                        "(4)" to "turnthe.gameon.tel",
+                        "(5)" to "playing.whydontyoustreamwme.com"
                     ).apmap { (name, value) ->
                         callback.invoke(
                             ExtractorLink(
                                 this.name,
-                                "$language - $name",
-                                it.url?.replace(domain, value) ?: "",
+                                "$language $name",
+                                it.url?.replace(url.host, value) ?: "",
                                 "$mainUrl/",
                                 quality,
                                 isM3u8 = true,
@@ -165,7 +169,7 @@ class NineGoal : MainAPI() {
                     callback.invoke(
                         ExtractorLink(
                             this.name,
-                            "$language - ${sourcesData.name}",
+                            "$language ${sourcesData.name}",
                             it.url ?: "",
                             "$mainUrl/",
                             quality,
