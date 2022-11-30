@@ -1,9 +1,12 @@
 package com.lagradost
 
 import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.LoadResponse.Companion.addDuration
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
+import okhttp3.FormBody
+import org.jsoup.nodes.Element
 
 class CineBlog01Provider : MainAPI() {
     override var lang = "it"
@@ -26,79 +29,87 @@ class CineBlog01Provider : MainAPI() {
     ): HomePageResponse {
         val url = request.data + page
         val soup = app.get(url).document
-
-        val home = soup.select("div.filmbox").map { series ->
-            val title = series.selectFirst("img")!!.attr("alt")
-            val link = series.selectFirst("a")!!.attr("href")
-            val posterUrl = fixUrl(series.selectFirst("img")!!.attr("src"))
-            val quality = Regex("\\[([^\\]]*)]").find(series.selectFirst("h1")!!.text())?.groupValues?.get(1)
-            val year = Regex("\\(([^)]*)\\)").find(series.selectFirst("h1")!!.text())?.groupValues?.get(1)?.toIntOrNull()
-
-            newMovieSearchResponse(
-                title,
-                link,
-                TvType.TvSeries
-            ) {
-                this.posterUrl = posterUrl
-                this.quality = getQualityFromString(quality)
-                this.year = year
-            }
+        val home = soup.select("div.filmbox").mapNotNull { series ->
+            series.toSearchResult()
         }
-        return newHomePageResponse(request.name, home)
+        return newHomePageResponse(arrayListOf(HomePageList(request.name, home)), hasNext = true)
+    }
+
+    private fun Element.toSearchResult(): SearchResponse? {
+        val title =
+            this.selectFirst("img")?.attr("alt") ?: throw ErrorLoadingException("No Title found")
+        val link =
+            this.selectFirst("a")?.attr("href") ?: throw ErrorLoadingException("No Link found")
+        val posterUrl = fixUrl(
+            this.selectFirst("img")?.attr("src") ?: throw ErrorLoadingException("No Poster found")
+        )
+        val quality = Regex("\\[([^\\]]*)]").find(
+            this.selectFirst("h1")?.text() ?: ""
+        )?.groupValues?.getOrNull(1) ?: ""
+        val year = Regex("\\(([^)]*)\\)").find(
+            this.selectFirst("h1")?.text() ?: ""
+        )?.groupValues?.getOrNull(1)?.toIntOrNull()
+        return newMovieSearchResponse(
+            title,
+            link,
+            TvType.TvSeries
+        ) {
+            this.year = year
+            addPoster(posterUrl)
+            addQuality(quality)
+        }
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
+        val body = FormBody.Builder()
+            .addEncoded("do", "search")
+            .addEncoded("subaction", "search")
+            .addEncoded("story", query)
+            .addEncoded("sortby", "news_read")
+            .build()
         val doc = app.post(
-            "$mainUrl/index.php?do=search", data = mapOf(
-                "do" to "search",
-                "subaction" to "search",
-                "story" to query
-            )
+            "$mainUrl/index.php",
+            requestBody = body
         ).document
-        return doc.select("div.filmbox").map { series ->
-            val title = series.selectFirst("img")!!.attr("alt")
-            val link = series.selectFirst("a")!!.attr("href")
-            val posterUrl = fixUrl(series.selectFirst("img")!!.attr("src"))
-            var quality = Regex("\\[([^\\]]*)]").find(series.selectFirst("h1")!!.text())?.groupValues?.get(1)
-            var year = Regex("\\(([^)]*)\\)").find(series.selectFirst("h1")!!.text())?.groupValues?.get(1)?.toIntOrNull()
 
-            newMovieSearchResponse(
-                title,
-                link,
-                TvType.TvSeries
-            ) {
-                this.posterUrl = posterUrl
-                this.quality = getQualityFromString(quality)
-                this.year = year
-            }
-
+        return doc.select("div.filmbox").mapNotNull { series ->
+            series.toSearchResult()
         }
     }
 
     override suspend fun load(url: String): LoadResponse {
         val document = app.get(url).document
         val title = document.selectFirst("div.imgrow > img")!!.attr("alt")
-        val description = document.selectFirst("div.fstory")?.text()?.removeSuffix(" +Info »")?.substringAfter("′ - ")
-        var year = document.selectFirst("div.filmboxfull")?.getElementsByAttributeValueContaining("href" , "/anno/")?.text()?.toIntOrNull()
+        val description = document.selectFirst("div.fstory")?.text()?.removeSuffix(" +Info »")
+            ?.substringAfter("′ - ")
+        val year = document.selectFirst("div.filmboxfull")
+            ?.getElementsByAttributeValueContaining("href", "/anno/")?.text()?.toIntOrNull()
         val poster = fixUrl(document.selectFirst("div.imgrow > img")!!.attr("src"))
         val dataUrl = document.select("ul.mirrors-list__list > li").map {
             it.select("a").attr("href")
-        }.drop(1).joinToString (",")
+        }.drop(1).joinToString(",")
         val trailerUrl =
-            document.select("iframe").firstOrNull { it.attr("src").contains("youtube") }?.attr("src")
+            document.select("iframe").firstOrNull { it.attr("src").contains("youtube") }
+                ?.attr("src")
                 ?.let { fixUrl(it) }
-
+        val tags =
+            document.selectFirst("#dle-content h4")?.text()?.substringBefore("- DURATA")?.trim()
+                ?.split(" / ")
+        val duration = Regex("DURATA (.*)′").find(
+            document.selectFirst("#dle-content h4")?.text() ?: ""
+        )?.groupValues?.last()
         return newMovieLoadResponse(
             title,
             url,
             TvType.Movie,
             dataUrl = dataUrl
         ) {
-
             this.plot = description
             this.year = year
             this.posterUrl = poster
+            this.tags = tags
             addTrailer(trailerUrl)
+            addDuration(duration)
         }
     }
 

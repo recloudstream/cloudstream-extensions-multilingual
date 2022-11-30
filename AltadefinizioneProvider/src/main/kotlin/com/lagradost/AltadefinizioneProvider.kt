@@ -53,6 +53,7 @@ class AltadefinizioneProvider : MainAPI() {
             .addEncoded("story", query)
             .addEncoded("sortby", "news_read")
             .build()
+            
         val doc = app.post(
             "$mainUrl/index.php",
             requestBody = body
