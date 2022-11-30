@@ -3,6 +3,8 @@ package com.lagradost
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
+import okhttp3.FormBody
+import org.jsoup.nodes.Element
 
 
 class CineBlogProvider : MainAPI() {
@@ -29,118 +31,94 @@ class CineBlogProvider : MainAPI() {
     ): HomePageResponse {
         val url = request.data.replace("number", page.toString())
         val soup = app.get(url, referer = url.substringBefore("page")).document
-        val home = soup.select("article.item").map {
-            val title = it.selectFirst("div.data > h3 > a")!!.text().substringBefore("(")
-            val link = it.selectFirst("div.poster > a")!!.attr("href")
-            val quality = getQualityFromString(it.selectFirst("span.quality")?.text())
-            TvSeriesSearchResponse(
-                title,
-                link,
-                this.name,
-                TvType.Movie,
-                it.selectFirst("img")!!.attr("src"),
-                null,
-                null,
-                quality = quality
-            )
+        val home = soup.select("article.item").mapNotNull {
+            it.toSearchResult()
         }
-        return newHomePageResponse(request.name, home)
+        return newHomePageResponse(arrayListOf(HomePageList(request.name, home)), hasNext = true)
+    }
+
+    private fun Element.toSearchResult(): SearchResponse{
+        val title = this.selectFirst("div.data > h3 > a")?.text()?.substringBefore("(") ?:
+                    this.selectFirst("a > img")?.attr("alt")?.substringBeforeLast("(") ?:
+                    throw ErrorLoadingException("No Title found")
+
+        val link =  this.selectFirst("div.poster > a")?.attr("href") ?:
+                    this.selectFirst("a")?.attr("href") ?:
+                    throw ErrorLoadingException("No Link found")
+
+        val quality =   this.selectFirst("span.quality")?.text()
+
+        val posterUrl = this.selectFirst("img")?.attr("src") ?:
+                        this.selectFirst("a > img")?.attr("src")
+
+        return newMovieSearchResponse(title, link, TvType.Movie){
+            addPoster(posterUrl)
+            if (quality != null) {
+                addQuality(quality)
+            }
+        }
+    }
+
+    private fun Element.toEpisode(season: Int): Episode {
+        val href = this.selectFirst("div.episodiotitle > a")?.attr("href")?: throw ErrorLoadingException("No Link found")
+        val epNum = this.selectFirst("div.numerando")?.text()?.substringAfter("-")?.filter { it.isDigit() }?.toIntOrNull()
+        val epTitle = this.selectFirst("div.episodiotitle > a")?.text()?: throw ErrorLoadingException("No Title found")
+        val posterUrl = this.selectFirst("div.imagen > img")?.attr("src")
+        return Episode(
+            href,
+            epTitle,
+            season,
+            epNum,
+            posterUrl,
+        )
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val queryformatted = query.replace(" ", "+")
-        val url = "$mainUrl?s=$queryformatted"
+        val queryFormatted = query.replace(" ", "+")
+        val url = "$mainUrl?s=$queryFormatted"
         val doc = app.get(url,referer= mainUrl ).document
         return doc.select("div.result-item").map {
-            val href = it.selectFirst("div.image > div > a")!!.attr("href")
-            val poster = it.selectFirst("div.image > div > a > img")!!.attr("src")
-            val name = it.selectFirst("div.details > div.title > a")!!.text().substringBefore("(")
-            MovieSearchResponse(
-                name,
-                href,
-                this.name,
-                TvType.Movie,
-                poster
-            )
-
+            it.toSearchResult()
         }
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val page = app.get(url)
-        val document = page.document
+        val document = app.get(url).document
         val type = if (url.contains("film")) TvType.Movie else TvType.TvSeries
-        val title = document.selectFirst("div.data > h1")!!.text().substringBefore("(")
+        val title = document.selectFirst("div.data > h1")?.text()?.substringBefore("(")?: throw ErrorLoadingException("No Title found")
         val description = document.select("#info > div.wp-content > p").html().toString()
-        val rating = null
-        var year = document.selectFirst(" div.data > div.extra > span.date")!!.text().substringAfter(",")
-            .filter { it.isDigit() }
-        if (year.length > 4) {
-            year = year.dropLast(4)
-        }
-
-        val poster = 
+        val year = document.selectFirst(" div.data > div.extra > span.date")?.text()?.substringAfter(",")?.filter { it.isDigit() }.let { it?.dropLast(4) }
+        val poster =
             document.selectFirst("#dt_galery")?.selectFirst("a")?.attr("href")?.trim()?:
-            document.selectFirst("div.poster > img")!!.attr("src")
-
-        val recomm = document.select("#single_relacionados >article").map {
-            val href = it.selectFirst("a")!!.attr("href")
-            val posterUrl = it.selectFirst("a > img")!!.attr("src")
-            val name = it.selectFirst("a > img")!!.attr("alt").substringBeforeLast("(")
-            MovieSearchResponse(
-                name,
-                href,
-                this.name,
-                TvType.Movie,
-                posterUrl
-            )
-
+            document.selectFirst("div.poster > img")?.attr("src")
+        val recommendations = document.select("#single_relacionados >article").map {
+            it.toSearchResult()
         }
-
 
         if (type == TvType.TvSeries) {
-
-            val episodeList = ArrayList<Episode>()
-            document.select("#seasons > div").reversed().map { element ->
-                val season = element.selectFirst("div.se-q > span.se-t")!!.text().toInt()
+            val episodeList = document.select("#seasons > div").reversed().map { element ->
+                val season = element.selectFirst("div.se-q > span.se-t")?.text()?.toIntOrNull()?:throw ErrorLoadingException("No Season found")
                 element.select("div.se-a > ul > li").filter { it -> it.text()!="There are still no episodes this season" }.map{ episode ->
-                    val href = episode.selectFirst("div.episodiotitle > a")!!.attr("href")
-                    val epNum =episode.selectFirst("div.numerando")!!.text().substringAfter("-").filter { it.isDigit() }.toIntOrNull()
-                    val epTitle = episode.selectFirst("div.episodiotitle > a")!!.text()
-                    val posterUrl =  episode.selectFirst("div.imagen > img")!!.attr("src")
-                    episodeList.add(
-                        Episode(
-                            href,
-                            epTitle,
-                            season,
-                            epNum,
-                            posterUrl,
-                        )
-                    )
+                    episode.toEpisode(season)
                 }
-            }
-            return TvSeriesLoadResponse(
+            }.flatten()
+
+            return newTvSeriesLoadResponse(
                 title,
                 url,
-                this.name,
                 type,
-                episodeList,
-                fixUrlNull(poster),
-                year.toIntOrNull(),
-                description,
-                null,
-                rating,
-                null,
-                null,
-                mutableListOf(),
-                recomm
-            )
+                episodeList){
+                this.recommendations = recommendations
+                this.year = year?.toIntOrNull()
+                this.plot = description
+                addPoster(poster)
+            }
         } else {
             val actors: List<ActorData> =
-                document.select("div.person").filter{ it -> it.selectFirst("div.img > a > img")?.attr("src")!!.contains("/no/cast.png").not()}.map { actordata ->
-                    val actorName = actordata.selectFirst("div.data > div.name > a")!!.text()
+                document.select("div.person").filter{ it -> it.selectFirst("div.img > a > img")?.attr("src")?.contains("/no/cast.png")?.not()?:false}.map { actordata ->
+                    val actorName = actordata.selectFirst("div.data > div.name > a")?.text()?:throw ErrorLoadingException("No Actor name found")
                     val actorImage : String? = actordata.selectFirst("div.img > a > img")?.attr("src")
-                    val roleActor = actordata.selectFirst("div.data > div.caracter")!!.text()
+                    val roleActor = actordata.selectFirst("div.data > div.caracter")?.text()
                     ActorData(actor = Actor(actorName, image = actorImage), roleString = roleActor )
                 }
             return newMovieLoadResponse(
@@ -149,13 +127,11 @@ class CineBlogProvider : MainAPI() {
                 type,
                 url
             ) {
-                posterUrl = fixUrlNull(poster)
-                this.year = year.toIntOrNull()
+                this.recommendations = recommendations
+                this.year = year?.toIntOrNull()
                 this.plot = description
-                this.rating = rating
-                this.recommendations = recomm
-                this.duration = null
                 this.actors = actors
+                addPoster(poster)
             }
         }
     }
@@ -169,11 +145,14 @@ class CineBlogProvider : MainAPI() {
         val doc = app.get(data).document
         val type = if( data.contains("film") ){"movie"} else {"tv"}
         val idpost=doc.select("#player-option-1").attr("data-post")
-        val test = app.post("$mainUrl/wp-admin/admin-ajax.php", headers = mapOf(
+
+        val test = app.post("$mainUrl/wp-admin/admin-ajax.php",
+            headers = mapOf(
             "content-type" to "application/x-www-form-urlencoded; charset=UTF-8",
             "accept" to "*/*",
             "X-Requested-With" to "XMLHttpRequest",
-        ), data = mapOf(
+        ),
+            data = mapOf(
             "action" to "doo_player_ajax",
             "post" to idpost,
             "nume" to "1",
