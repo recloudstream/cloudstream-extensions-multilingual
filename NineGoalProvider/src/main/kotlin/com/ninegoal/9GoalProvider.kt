@@ -142,10 +142,6 @@ class NineGoal : MainAPI() {
             } catch (e: UnknownHostException) {
                 false
             }
-<<<<<<< Updated upstream
-            val domain = fixUrl(it.url?.getDomainFromUrl() ?: "https://canyou.letmestreamyou.net")
-=======
->>>>>>> Stashed changes
             if (!requestStatus) {
                     mapOf(
                         "(1)" to "playing.smoothlikebutterstream.com",
