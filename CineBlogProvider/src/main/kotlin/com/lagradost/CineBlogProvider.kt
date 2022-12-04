@@ -7,7 +7,7 @@ import com.lagradost.cloudstream3.utils.loadExtractor
 
 class CineBlogProvider : MainAPI() {
     override var lang = "it"
-    override var mainUrl = "https://cb01.rip"
+    override var mainUrl = "https://cb01.li"
     override var name = "CB01"
     override val hasMainPage = true
     override val hasChromecastSupport = true
@@ -179,7 +179,7 @@ class CineBlogProvider : MainAPI() {
         ))
 
         val url2= Regex("""src='((.|\\n)*?)'""").find(test.text)?.groups?.get(1)?.value.toString()
-        val trueUrl = app.get(url2, headers = mapOf("referer" to mainUrl)).url
+        val trueUrl = app.get(url2, headers = mapOf("Referer" to mainUrl)).url
         loadExtractor(trueUrl, data, subtitleCallback, callback)
 
         return true
