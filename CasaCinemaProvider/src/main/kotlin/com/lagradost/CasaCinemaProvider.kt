@@ -49,16 +49,15 @@ class CasaCinemaProvider : MainAPI() { // all providers must be an instance of M
         val quality = this.selectFirst("div.hd")?.text()
 
         val posterUrl = this.selectFirst("a")?.attr("data-thumbnail")
-        
-        if(isMovie){
+
+        if (isMovie) {
             return newMovieSearchResponse(title, link, TvType.Movie) {
                 addPoster(posterUrl)
                 if (quality != null) {
                     addQuality(quality)
                 }
             }
-        }
-        else{
+        } else {
             return newTvSeriesSearchResponse(title, link, TvType.TvSeries) {
                 addPoster(posterUrl)
                 if (quality != null) {
@@ -66,7 +65,6 @@ class CasaCinemaProvider : MainAPI() { // all providers must be an instance of M
                 }
             }
         }
-        
     }
 
     private fun Element.toEpisode(season: Int): Episode {
@@ -96,7 +94,7 @@ class CasaCinemaProvider : MainAPI() { // all providers must be an instance of M
                         ?.text()
                         ?.replace("[HD]", "")
                         ?.substringBefore("(")
-                        ?: throw ErrorLoadingException("No Title found")
+                        ?: "No Title found"
         val description = document.select("div.element").last()?.text()
         val year = document.selectFirst("div.element>a.tag")?.text()?.substringBefore("-")
         val poster = document.selectFirst("img.thumbnail")?.attr("src")
@@ -110,7 +108,7 @@ class CasaCinemaProvider : MainAPI() { // all providers must be an instance of M
                                         element.selectFirst("li.s_title>span.season-title")
                                                 ?.text()
                                                 ?.toIntOrNull()
-                                                ?: throw ErrorLoadingException("No Season found")
+                                                ?: 0
                                 element.select("div.episode-wrap").map { episode ->
                                     episode.toEpisode(season)
                                 }
@@ -126,10 +124,9 @@ class CasaCinemaProvider : MainAPI() { // all providers must be an instance of M
         } else {
             val actors: List<ActorData> =
                     document.select("div.cast_wraper>ul>li").map { actordata ->
-                        val actorName =
-                                actordata.selectFirst("strong")?.text()
-                                        ?: throw ErrorLoadingException("No Actor name found")
-                        val actorImage: String? = actordata.selectFirst("figure>img")?.attr("src")
+                        val actorName = actordata.selectFirst("strong")?.text() ?: ""
+                        val actorImage: String? =
+                                actordata.selectFirst("figure>img")?.attr("src") ?: ""
                         ActorData(actor = Actor(actorName, image = actorImage))
                     }
             val data = document.select(".embed-player").map { it.attr("data-id") }.toJson()
