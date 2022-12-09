@@ -2,6 +2,7 @@ package com.lagradost
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addRating
+import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.TvType
@@ -141,6 +142,12 @@ class IlGenioDelloStreamingProvider : MainAPI() {
                         ?.filter { it.isDigit() }
         val poster = document.selectFirst("div.poster>img")?.attr("src")
         val rating = document.selectFirst("span.valor>strong")?.text()?.toRatingInt()
+        val trailer =
+                "https://www.youtube.com/watch?v=" +
+                        document.selectFirst("img.youtube__img")
+                                ?.attr("src")
+                                ?.substringAfter("vi/")
+                                ?.substringBefore("/")
         val recomm = document.select("article.w_item_b").map { it.toRecommendResult() }
         if (type == TvType.TvSeries) {
             val episodeList =
@@ -163,6 +170,7 @@ class IlGenioDelloStreamingProvider : MainAPI() {
                 this.recommendations = recomm
                 addPoster(poster)
                 addRating(rating)
+                addTrailer(trailer)
             }
         } else {
             val actors: List<ActorData> =
@@ -180,6 +188,7 @@ class IlGenioDelloStreamingProvider : MainAPI() {
                 this.recommendations = recomm
                 addPoster(poster)
                 addRating(rating)
+                addTrailer(trailer)
             }
         }
     }
