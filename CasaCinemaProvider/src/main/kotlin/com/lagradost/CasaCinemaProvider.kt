@@ -122,7 +122,7 @@ class CasaCinemaProvider : MainAPI() { // all providers must be an instance of M
             val actors: List<ActorData> =
                 document.select("div.cast_wraper>ul>li").map { actordata ->
                     val actorName = actordata.selectFirst("strong")?.text() ?: ""
-                    val actorImage: String? =
+                    val actorImage: String =
                         actordata.selectFirst("figure>img")?.attr("src") ?: ""
                     ActorData(actor = Actor(actorName, image = actorImage))
                 }
@@ -182,6 +182,8 @@ class CasaCinemaProvider : MainAPI() { // all providers must be an instance of M
                 ?.text()
                 ?.substringAfter("x")
                 ?.substringBefore(" ")
+                ?.filter { it.isDigit() }
+                .orEmpty().ifBlank { "0" }
 
         val epTitle =
             this.selectFirst("li.other_link>a")?.text().orEmpty().ifBlank {
