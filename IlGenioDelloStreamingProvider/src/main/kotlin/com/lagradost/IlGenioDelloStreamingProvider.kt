@@ -1,6 +1,5 @@
 package com.lagradost
 
-import android.util.Log
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addRating
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
@@ -34,6 +33,15 @@ class IlGenioDelloStreamingProvider : MainAPI() {
         )
     private val interceptor = CloudflareKiller()
 
+    private fun fixTitle(element: Element?): String {
+        return element?.text()
+            ?.trim()
+            ?.substringBefore("Streaming")
+            ?.replace("[HD]", "")
+            ?.replace("\\(\\d{4}\\)".toRegex(), "")
+            ?: "No Title found"
+    }
+
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = request.data + page
 
@@ -45,12 +53,7 @@ class IlGenioDelloStreamingProvider : MainAPI() {
 
     private fun Element.toMainPageResult(): SearchResponse {
         val title =
-            this.selectFirst("div.data>h3")
-                ?.text()
-                ?.trim()
-                ?.replace("[HD]", "")
-                ?.replace("\\(\\d{4}\\)".toRegex(), "")
-                ?: "No title"
+            fixTitle(this.selectFirst("div.data>h3"))
         val isMovie =
             (this.selectFirst("div.data>h3")?.text() ?: "").contains("\\(\\d{4}\\)".toRegex())
         val link =
@@ -82,12 +85,7 @@ class IlGenioDelloStreamingProvider : MainAPI() {
 
     private fun Element.toSearchResult(): SearchResponse {
         val title =
-            this.selectFirst("div.title>a")
-                ?.text()
-                ?.trim()
-                ?.replace("[HD]", "")
-                ?.replace("\\(\\d{4}\\)".toRegex(), "")
-                ?: "No title"
+            fixTitle(this.selectFirst("div.title>a"))
         val isMovie =
             (this.selectFirst("div.title>a")?.text() ?: "").contains("\\(\\d{4}\\)".toRegex())
         val link =
@@ -122,13 +120,7 @@ class IlGenioDelloStreamingProvider : MainAPI() {
             else TvType.Movie
 
         val title =
-            document.selectFirst("div.data > h1")
-                ?.text()
-                ?.trim()
-                ?.substringBefore("Streaming")
-                ?.replace("[HD]", "")
-                ?.replace("\\(\\d{4}\\)".toRegex(), "")
-                ?: "No Title found"
+            fixTitle(document.selectFirst("div.data > h1"))
         val description =
             document.selectFirst("div#info")
                 ?.text()
@@ -143,11 +135,11 @@ class IlGenioDelloStreamingProvider : MainAPI() {
         val poster = document.selectFirst("div.poster>img")?.attr("src")
         val rating = document.selectFirst("span.valor>strong")?.text()?.toRatingInt()
         val trailer =
-            "https://www.youtube.com/watch?v=" +
-                    document.selectFirst("img.youtube__img")
-                        ?.attr("src")
-                        ?.substringAfter("vi/")
-                        ?.substringBefore("/")
+            document.selectFirst("img.youtube__img")
+                ?.attr("src")
+                ?.substringAfter("vi/")
+                ?.substringBefore("/")
+                ?.let { "https://www.youtube.com/watch?v=$it" }
         val recomm = document.select("article.w_item_b").map { it.toRecommendResult() }
         if (type == TvType.TvSeries) {
             val episodeList =
@@ -176,7 +168,7 @@ class IlGenioDelloStreamingProvider : MainAPI() {
             val actors: List<ActorData> =
                 document.select("div.cast_wraper>ul>li").map { actordata ->
                     val actorName = actordata.selectFirst("strong")?.text() ?: ""
-                    val actorImage: String? =
+                    val actorImage: String =
                         actordata.selectFirst("figure>img")?.attr("src") ?: ""
                     ActorData(actor = Actor(actorName, image = actorImage))
                 }
@@ -195,12 +187,7 @@ class IlGenioDelloStreamingProvider : MainAPI() {
 
     private fun Element.toRecommendResult(): SearchResponse {
         val title =
-            this.selectFirst("div.data>h3")
-                ?.text()
-                ?.trim()
-                ?.replace("[HD]", "")
-                ?.replace("\\(\\d{4}\\)".toRegex(), "")
-                ?: "No title"
+            fixTitle(this.selectFirst("div.data>h3"))
         val isMovie =
             (this.selectFirst("div.data>h3")?.text() ?: "").contains("\\(\\d{4}\\)".toRegex())
         val link =
@@ -237,6 +224,8 @@ class IlGenioDelloStreamingProvider : MainAPI() {
                 ?.text()
                 ?.substringAfter("x")
                 ?.substringBefore(" ")
+                ?.filter { it.isDigit() }
+                .orEmpty().ifBlank { "0" }
 
         val epTitle =
             this.selectFirst("li.other_link>a")?.text().orEmpty().ifBlank {
