@@ -103,12 +103,12 @@ class MundoDonghuaProvider : MainAPI() {
             else -> null
         }
         var counter = 0
-        val specialEpisodes = app.get(mainUrl, timeout = 120).document.select("div.row .col-xs-4").map {
+        val specialEpisodes = app.get(mainUrl, timeout = 120).document.select(".col-xs-4").map {
             counter = counter + 1
             if (counter < 7){
                 if (it.selectFirst("h5")?.text()?.lowercase()?.contains(title.lowercase()) ?: false) {
-                    val name = it.selectFirst("h5")?.text()?.replace("Episodio","-") ?: "fallo"
-                    val link = it.selectFirst("a")?.attr("href") ?: "fallo"
+                    val name = it.selectFirst("h5")?.text()?.replace("Episodio","-")
+                    val link = it.selectFirst("a")?.attr("href")
                     Episode(fixUrl(link), name)
                 }
             }
