@@ -92,7 +92,6 @@ class MundoDonghuaProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val doc2 = app.get(mainUrl, timeout = 120).document
         val doc = app.get(url, timeout = 120).document
         val poster = doc.selectFirst("head meta[property=og:image]")?.attr("content") ?: ""
         val title = doc.selectFirst(".ls-title-serie")?.text() ?: ""
@@ -104,16 +103,16 @@ class MundoDonghuaProvider : MainAPI() {
             else -> null
         }
         var counter = 0
-        val specialEpisodes = doc2.select("div.row .col-xs-4").map {
+        val specialEpisodes = app.get(mainUrl, timeout = 120).document.select("div.row .col-xs-4").map {
             counter = counter + 1
             if (counter < 7){
-                if (it.selectFirst("h5")?.text()?.contains(title) ?: false) {
+                if (it.selectFirst("h5")?.text()?.toLowerCase()?.contains(title.toLowerCase()) ?: false) {
                     val name = it.selectFirst("h5")?.text()?.replace("Episodio","-") ?: "fallo"
                     val link = it.selectFirst("a")?.attr("href") ?: "fallo"
                     Episode(fixUrl(link), name)
                 }
             }
-        }.filterNotNull()
+        }
         val episodes = doc.select("ul.donghua-list a").map {
             val name = it.selectFirst(".fs-16")?.text()
             val link = it.attr("href")
