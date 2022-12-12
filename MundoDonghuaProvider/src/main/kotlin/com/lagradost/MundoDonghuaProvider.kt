@@ -103,7 +103,7 @@ class MundoDonghuaProvider : MainAPI() {
             else -> null
         }
         var counter = 0
-        val specialEpisodes = app.get(mainUrl, timeout = 120).document.select(".col-xs-4").map {
+        val specialEpisodes = app.get(mainUrl, timeout = 120).document.select("div.row .col-xs-4").map {
             counter = counter + 1
             if (counter < 7) {
                 val name = it.selectFirst("h5")?.text()?.replace("Episodio","-") ?: ""
