@@ -108,17 +108,15 @@ class MundoDonghuaProvider : MainAPI() {
             if (counter < 7) {
                 val name = it.selectFirst("h5")?.text()?.replace("Episodio","-") ?: ""
                 val link = it.selectFirst("a")?.attr("href") ?: ""
-                if (name.lowercase().contains(title.lowercase())) {
-                    Episode(fixUrl(link), name)
-                }
+                Episode(fixUrl(link), name)
             }
-        }
+        }.reversed()
         val episodes = doc.select("ul.donghua-list a").map {
             val name = it.selectFirst(".fs-16")?.text()
             val link = it.attr("href")
             Episode(fixUrl(link), name)
         }.reversed()
-        val episodesFinal = specialEpisodes + episodes
+        val episodesFinal = episodes + specialEpisodes
         val typeinfo = doc.select("div.row div.col-md-6.pl-15 p.fc-dark").text()
         val tvType = if (typeinfo.contains(Regex("Tipo.*Pel.cula"))) TvType.AnimeMovie else TvType.Anime
         return newAnimeLoadResponse(title, url, tvType) {
