@@ -36,9 +36,15 @@ class MundoDonghuaProvider : MainAPI() {
                     val title = it.selectFirst("h5")?.text() ?: ""
                     val poster = it.selectFirst(".fit-1 img")?.attr("src")
                     val epRegex = Regex("(\\/(\\d+)\$)")
-                    val url = it.selectFirst("a")?.attr("href")?.replace(epRegex,"")?.replace("/ver/","/donghua/")
+                    var url = it.selectFirst("a")?.attr("href")?.replace(epRegex,"")?.replace("/ver/","/donghua/")
+                    var urllast = url?.last()
                     val epnumRegex = Regex("((\\d+)$)")
                     val epNum = epnumRegex.find(title)?.value?.toIntOrNull()
+                    val epNumLenght = epNum.toString()!!.length
+                    if (urllast.toString() == "="){
+                        val numbersfinal = 61 + epNumLenght + 1
+                        url = url?.dropLast(numbersfinal)
+                    }
                     val dubstat = if (title.contains("Latino") || title.contains("Castellano")) DubStatus.Dubbed else DubStatus.Subbed
                     newAnimeSearchResponse(title.replace(Regex("Episodio|(\\d+)"),"").trim(), fixUrl(url ?: "")) {
                         this.posterUrl = fixUrl(poster ?: "")
