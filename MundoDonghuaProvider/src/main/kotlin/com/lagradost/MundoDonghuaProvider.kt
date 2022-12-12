@@ -105,7 +105,7 @@ class MundoDonghuaProvider : MainAPI() {
         var counter = 0
         val specialEpisodes = app.get(mainUrl, timeout = 120).document.select(".col-xs-4").map {
             counter = counter + 1
-            if (counter < 7)
+            if (counter < 7) {
                 val name = it.selectFirst("h5")?.text()?.replace("Episodio","-") ?: ""
                 val link = it.selectFirst("a")?.attr("href") ?: ""
                 if (name.lowercase().contains(title.lowercase())) {
