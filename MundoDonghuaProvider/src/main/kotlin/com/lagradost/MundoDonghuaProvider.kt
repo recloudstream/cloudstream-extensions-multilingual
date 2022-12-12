@@ -93,6 +93,7 @@ class MundoDonghuaProvider : MainAPI() {
 
     override suspend fun load(url: String): LoadResponse {
         val doc = app.get(url, timeout = 120).document
+        val doc2 = app.get(mainUrl, timeout = 120).document
         val poster = doc.selectFirst("head meta[property=og:image]")?.attr("content") ?: ""
         val title = doc.selectFirst(".ls-title-serie")?.text() ?: ""
         val description = doc.selectFirst("p.text-justify.fc-dark")?.text() ?: ""
@@ -106,7 +107,13 @@ class MundoDonghuaProvider : MainAPI() {
             val name = it.selectFirst(".fs-16")?.text()
             val link = it.attr("href")
             Episode(fixUrl(link), name)
-        }.reversed()
+        }.addAll(doc2.selectFirst("sm-row bg-white pt-10 pr-20 pb-15 pl-20").selectFirst("row").select("item col-lg-2 col-md-2 col-xs-4").map {
+            if (it.selectFirst("sf fc-dark f-bold")?.text().includes(title)) {
+                val name = it.selectFirst("sf fc-dark f-bold")?.text()?.replace("Episodio","-")
+                val link = it.attr("href")
+                Episode(fixUrl(link), name)
+            }
+        }).reversed()
         val typeinfo = doc.select("div.row div.col-md-6.pl-15 p.fc-dark").text()
         val tvType = if (typeinfo.contains(Regex("Tipo.*Pel.cula"))) TvType.AnimeMovie else TvType.Anime
         return newAnimeLoadResponse(title, url, tvType) {
