@@ -107,8 +107,8 @@ class MundoDonghuaProvider : MainAPI() {
             counter = counter + 1
             if (counter < 7){
                 if (it.selectFirst("h5")?.text()?.lowercase()?.contains(title.lowercase()) ?: false) {
-                    val name = it.selectFirst("h5")?.text()?.replace("Episodio","-")
-                    val link = it.selectFirst("a")?.attr("href")
+                    val name = it.selectFirst("h5")?.text()?.replace("Episodio","-") ?: ""
+                    val link = it.selectFirst("a")?.attr("href") ?: ""
                     Episode(fixUrl(link), name)
                 }
             }
