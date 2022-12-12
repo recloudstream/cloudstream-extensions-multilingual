@@ -103,7 +103,7 @@ class MundoDonghuaProvider : MainAPI() {
             else -> null
         }
         var counter = 0
-        var condition = ""
+        var condition = false
         val specialEpisodes = app.get(mainUrl, timeout = 120).document.select(".col-xs-4").map {
             counter = counter + 1
             if (counter < 7){
