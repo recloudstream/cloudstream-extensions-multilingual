@@ -103,10 +103,12 @@ class MundoDonghuaProvider : MainAPI() {
             else -> null
         }
         var counter = 0
+        var condition = ""
         val specialEpisodes = app.get(mainUrl, timeout = 120).document.select(".col-xs-4").map {
             counter = counter + 1
             if (counter < 7){
-                if (it.selectFirst("h5")?.text()?.lowercase()?.contains(title.lowercase()) != null && it.selectFirst("h5")?.text()?.lowercase()?.contains(title.lowercase())) {
+                condition = it.selectFirst("h5")?.text()?.lowercase()?.contains(title.lowercase())
+                if (condition != null && condition == true) {
                     val name = it.selectFirst("h5")?.text()?.replace("Episodio","-") ?: ""
                     val link = it.selectFirst("a")?.attr("href") ?: ""
                     Episode(fixUrl(link), name)
