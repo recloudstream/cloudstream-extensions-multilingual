@@ -119,7 +119,7 @@ class MundoDonghuaProvider : MainAPI() {
         val tvType = if (typeinfo.contains(Regex("Tipo.*Pel.cula"))) TvType.AnimeMovie else TvType.Anime
         return newAnimeLoadResponse(title, url, tvType) {
             posterUrl = poster
-            addEpisodes(DubStatus.Subbed, episodes + specialEpisodes)
+            addEpisodes(DubStatus.Subbed, listOf<Episode>(episodes + specialEpisodes))
             showStatus = status
             plot = description
             tags = genres
