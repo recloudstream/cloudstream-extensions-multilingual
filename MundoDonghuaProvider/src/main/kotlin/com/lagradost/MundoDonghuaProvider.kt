@@ -104,13 +104,13 @@ class MundoDonghuaProvider : MainAPI() {
             else -> null
         }
         val specialEpisodes = doc2.selectFirst("sm-row bg-white pt-10 pr-20 pb-15 pl-20")!!.selectFirst("row")!!.select("item col-lg-2 col-md-2 col-xs-4")!!.map {
-            if (it.selectFirst("sf fc-dark f-bold")?.text()?.contains(title)) {
+            if (it.selectFirst("sf fc-dark f-bold")?.text()?.contains(title) ?: false) {
                 val name = it.selectFirst("sf fc-dark f-bold")?.text()?.replace("Episodio","-")
                 val link = it.attr("href")
                 Episode(fixUrl(link), name)
             }
         }
-        var episodes = doc.select("ul.donghua-list a").map {
+        val episodes = doc.select("ul.donghua-list a").map {
             val name = it.selectFirst(".fs-16")?.text()
             val link = it.attr("href")
             Episode(fixUrl(link), name)
