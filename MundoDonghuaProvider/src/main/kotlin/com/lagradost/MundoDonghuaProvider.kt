@@ -108,6 +108,8 @@ class MundoDonghuaProvider : MainAPI() {
             val link = it.selectFirst("a")?.attr("href") ?: ""
             if (name.contains(title, true)) {
                 Episode(fixUrl(link), name)
+            } else {
+                return null
             }
         }.reversed()
         val episodes = doc.select("ul.donghua-list a").map {
