@@ -103,7 +103,7 @@ class MundoDonghuaProvider : MainAPI() {
             "Finalizada" -> ShowStatus.Completed
             else -> null
         }
-        val specialEpisodes = docSpecial.selectFirst("div.row")?.select(".col-xs-4").mapNotNull {
+        val specialEpisodes = docSpecial.selectFirst("div.row")?.select(".col-xs-4")?.mapNotNull {
             val name = it.selectFirst("h5")?.text()?.replace("Episodio","-") ?: ""
             val link = it.selectFirst("a")?.attr("href") ?: ""
             if (name.contains(title, true)) {
