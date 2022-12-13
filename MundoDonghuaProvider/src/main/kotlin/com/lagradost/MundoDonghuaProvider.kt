@@ -106,7 +106,7 @@ class MundoDonghuaProvider : MainAPI() {
         val specialEpisodes = docSpecial.select("div.row .col-xs-4").map {
             val name = it.selectFirst("h5")?.text()?.replace("Episodio","-") ?: ""
             val link = it.selectFirst("a")?.attr("href") ?: ""
-            if (name.contains(title, true) {
+            if (name.contains(title, true)) {
                 Episode(fixUrl(link), name)
             }
         }.reversed()
