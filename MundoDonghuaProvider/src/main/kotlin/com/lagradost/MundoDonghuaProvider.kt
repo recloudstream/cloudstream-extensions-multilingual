@@ -103,7 +103,7 @@ class MundoDonghuaProvider : MainAPI() {
             "Finalizada" -> ShowStatus.Completed
             else -> null
         }
-        val specialEpisodes = docSpecial.selectFirst("div.sm-row.bg-white.pt-10.pr-20.pb-15.pl-20 div.row")?.select(".col-xs-4")?.mapNotNull {
+        val specialEpisodes = docSpecial.select("div.sm-row.bg-white.pt-10.pr-20.pb-15.pl-20 div.item.col-lg-2.col-md-2.col-xs-4").mapNotNull {
             val name = it.selectFirst("h5")?.text()?.replace("Episodio","-") ?: ""
             val link = it.selectFirst("a")?.attr("href") ?: ""
             if (name.contains(title, true)) {
@@ -111,7 +111,7 @@ class MundoDonghuaProvider : MainAPI() {
             } else {
                 null
             }
-        }?.reversed()
+        }.reversed()
         val episodes = doc.select("ul.donghua-list a").map {
             val name = it.selectFirst(".fs-16")?.text()
             val link = it.attr("href")
