@@ -111,7 +111,7 @@ class MundoDonghuaProvider : MainAPI() {
             } else {
                 null
             }
-        }?.reversed() ?: emptyMap<Episode>()
+        }?.reversed() ?: null
         val episodes = doc.select("ul.donghua-list a").map {
             val name = it.selectFirst(".fs-16")?.text()
             val link = it.attr("href")
