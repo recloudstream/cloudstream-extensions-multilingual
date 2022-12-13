@@ -92,7 +92,7 @@ class MundoDonghuaProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val doc = app.get(url, timeout = 120).document
+        val doc = app.get(url, timeout = 120).document.selectFirst("div.row")
         val docSpecial = app.get("https://www.mundodonghua.com", timeout = 120).document
         val poster = doc.selectFirst("head meta[property=og:image]")?.attr("content") ?: ""
         val title = doc.selectFirst(".ls-title-serie")?.text() ?: ""
@@ -103,17 +103,11 @@ class MundoDonghuaProvider : MainAPI() {
             "Finalizada" -> ShowStatus.Completed
             else -> null
         }
-        var counter = 0
-        val specialEpisodes = docSpecial.select("div.row .col-xs-4").mapNotNull {
-            counter++
-            if (counter < 7) {
-                val name = it.selectFirst("h5")?.text()?.replace("Episodio","-") ?: ""
-                val link = it.selectFirst("a")?.attr("href") ?: ""
-                if (name.contains(title, true)) {
-                    Episode(fixUrl(link), name)
-                } else {
-                    null
-                }
+        val specialEpisodes = docSpecial.select(".col-xs-4").mapNotNull {
+            val name = it.selectFirst("h5")?.text()?.replace("Episodio","-") ?: ""
+            val link = it.selectFirst("a")?.attr("href") ?: ""
+            if (name.contains(title, true)) {
+                Episode(fixUrl(link), name)
             } else {
                 null
             }
