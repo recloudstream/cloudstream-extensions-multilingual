@@ -104,7 +104,7 @@ class MundoDonghuaProvider : MainAPI() {
             else -> null
         }
         var counter = 0
-        val specialEpisodes = docSpecial.select(".col-xs-4").mapNotNull {
+        val specialEpisodes = docSpecial.select("div.row .col-xs-4").mapNotNull {
             counter++
             if (counter < 7) {
                 val name = it.selectFirst("h5")?.text()?.replace("Episodio","-") ?: ""
@@ -123,7 +123,7 @@ class MundoDonghuaProvider : MainAPI() {
             val link = it.attr("href")
             Episode(fixUrl(link), name)
         }.reversed()
-        val episodesFinal = specialEpisodes
+        val episodesFinal = episodes + specialEpisodes
         val typeinfo = doc.select("div.row div.col-md-6.pl-15 p.fc-dark").text()
         val tvType = if (typeinfo.contains(Regex("Tipo.*Pel.cula"))) TvType.AnimeMovie else TvType.Anime
         return newAnimeLoadResponse(title, url, tvType) {
