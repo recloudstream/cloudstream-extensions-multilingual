@@ -62,13 +62,7 @@ class CasaCinemaProvider : MainAPI() { // all providers must be an instance of M
     }
 
     private fun Element.toSearchResult(): SearchResponse {
-        val title =
-            this.selectFirst(".title")
-                ?.text()
-                ?.trim()
-                ?.replace("[HD]", "")
-                ?.replace("\\(\\d{4}\\)".toRegex(), "")
-                ?: "No title"
+        val title = fixTitle(this.selectFirst(".title"))
         val isMovie = this.selectFirst(".title").isMovie()
         val link =
             this.selectFirst("a")?.attr("href") ?: throw ErrorLoadingException("No Link found")
@@ -94,8 +88,7 @@ class CasaCinemaProvider : MainAPI() { // all providers must be an instance of M
         val type =
             if (document.select("div.seasons-wraper").isNotEmpty()) TvType.TvSeries
             else TvType.Movie
-        val title =
-            fixTitle(document.selectFirst("div.row > h1"))
+        val title = fixTitle(document.selectFirst("div.row > h1"))
         val description = document.select("div.element").last()?.text()
         val year = document.selectFirst("div.element>a.tag")
             ?.text()
@@ -149,14 +142,8 @@ class CasaCinemaProvider : MainAPI() { // all providers must be an instance of M
 
     private fun Element.toRecommendResult(): SearchResponse {
         val title =
-            this.selectFirst("span.crp_title")
-                ?.text()
-                ?.trim()
-                ?.replace("[HD]", "")
-                ?.replace("\\(\\d{4}\\)".toRegex(), "")
-                ?: "No title"
-        val isMovie =
-            (this.selectFirst("span.crp_title")?.text() ?: "").contains("\\(\\d{4}\\)".toRegex())
+            fixTitle(this.selectFirst("span.crp_title"))
+        val isMovie = this.selectFirst("span.crp_title").isMovie()
         val link =
             this.selectFirst("a")?.attr("href") ?: throw ErrorLoadingException("No Link found")
 
