@@ -2,178 +2,237 @@ package com.lagradost
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addRating
+import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
+import com.lagradost.cloudstream3.MainAPI
+import com.lagradost.cloudstream3.SearchResponse
+import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.network.CloudflareKiller
+import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.AppUtils.toJson
-import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.ShortLink
+import com.lagradost.cloudstream3.utils.ShortLink.unshorten
 import com.lagradost.cloudstream3.utils.loadExtractor
-
-
+import org.jsoup.nodes.Element
 
 class IlGenioDelloStreamingProvider : MainAPI() {
     override var lang = "it"
-    override var mainUrl = "https://ilgeniodellostreaming.quest"
+    override var mainUrl = "https://ilgeniodellostreaming.hair"
     override var name = "IlGenioDelloStreaming"
     override val hasMainPage = true
     override val hasChromecastSupport = true
     override var sequentialMainPage = true
-    override val supportedTypes = setOf(
-        TvType.Movie,
-        TvType.TvSeries,
-    )
-    override val mainPage = mainPageOf(
-        Pair("$mainUrl/category/film/page/", "Film Popolari"),
-        Pair("$mainUrl/category/serie-tv/page/", "Serie Tv Popolari"),
-        Pair("$mainUrl/the-most-voted/page/", "I più votati"),
-        Pair("$mainUrl/prime-visioni/page/", "Ultime uscite"),
-    )
+    override val supportedTypes =
+        setOf(
+            TvType.Movie,
+            TvType.TvSeries,
+        )
+    override val mainPage =
+        mainPageOf(
+            Pair("$mainUrl/popular-movies/page/", "Film Popolari"),
+            Pair("$mainUrl/the-most-voted/page/", "I più votati"),
+        )
     private val interceptor = CloudflareKiller()
-    override suspend fun getMainPage(
-        page: Int,
-        request: MainPageRequest
-    ): HomePageResponse {
+
+    private fun fixTitle(element: Element?): String {
+        return element?.text()
+            ?.trim()
+            ?.substringBefore("Streaming")
+            ?.replace("[HD]", "")
+            ?.replace("\\(\\d{4}\\)".toRegex(), "")
+            ?: "No Title found"
+    }
+
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = request.data + page
-        val soup = app.get(url, interceptor = interceptor).document
-        val home = soup.select("div.items > article.item").map {
-            val title = it.selectFirst("div.data > h3 > a")!!.text().substringBeforeLast("(").substringBeforeLast("[")
-            val link = it.selectFirst("div.poster > a")!!.attr("href")
-            val quality = getQualityFromString(it.selectFirst("span.quality")?.text())
-            TvSeriesSearchResponse(
-                title,
-                link,
-                this.name,
-                TvType.Movie,
-                it.selectFirst("img")!!.attr("src"),
-                null,
-                null,
-                quality = quality
-            )
+
+        val soup = app.get(url, referer = mainUrl).document
+        val home = soup.select("div.items > article.item").mapNotNull { it.toMainPageResult() }
+        val hasNext = home.isNotEmpty()
+        return newHomePageResponse(arrayListOf(HomePageList(request.name, home)), hasNext = hasNext)
+    }
+
+    private fun Element.toMainPageResult(): SearchResponse {
+        val title =
+            fixTitle(this.selectFirst("div.data>h3"))
+        val isMovie =
+            (this.selectFirst("div.data>h3")?.text() ?: "").contains("\\(\\d{4}\\)".toRegex())
+        val link =
+            this.selectFirst("div.poster>a")?.attr("href")
+                ?: throw ErrorLoadingException("No Link found")
+
+        val quality = this.selectFirst("div.poster>span.quality")?.text()
+        val posterUrl = this.selectFirst("div.poster>a>img")?.attr("src")
+
+        return if (isMovie) {
+            newMovieSearchResponse(title, link, TvType.Movie) {
+                addPoster(posterUrl)
+                quality?.let { addQuality(it) }
+            }
+        } else {
+            newTvSeriesSearchResponse(title, link, TvType.TvSeries) {
+                addPoster(posterUrl)
+                quality?.let { addQuality(it) }
+            }
         }
-        return newHomePageResponse(request.name, home)
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val queryformatted = query.replace(" ", "+")
-        val url = "$mainUrl?s=$queryformatted"
-        val doc = app.get(url, interceptor = interceptor, referer = mainUrl).document
-        return doc.select("div.result-item").map {
-            val href = it.selectFirst("div.image > div > a")!!.attr("href")
-            val poster = it.selectFirst("div.image > div > a > img")!!.attr("src")
-            val name = it.selectFirst("div.details > div.title > a")!!.text().substringBeforeLast("(").substringBeforeLast("[")
-            MovieSearchResponse(
-                name,
-                href,
-                this.name,
-                TvType.Movie,
-                poster
-            )
+        val queryFormatted = query.replace(" ", "+")
+        val url = "$mainUrl/?s=$queryFormatted"
+        val doc = app.get(url, referer = mainUrl, interceptor = interceptor).document
+        return doc.select("div.search-page>div.result-item").map { it.toSearchResult() }
+    }
 
+    private fun Element.toSearchResult(): SearchResponse {
+        val title =
+            fixTitle(this.selectFirst("div.title>a"))
+        val isMovie =
+            (this.selectFirst("div.title>a")?.text() ?: "").contains("\\(\\d{4}\\)".toRegex())
+        val link =
+            this.selectFirst("div.title>a")?.attr("href")
+                ?: throw ErrorLoadingException("No Link found")
+
+        val quality =
+            this.selectFirst("div.title>a")?.text()?.substringAfter("[")?.substringBefore("]")
+        val posterUrl = this.selectFirst("a>img")?.attr("src")
+
+        return if (isMovie) {
+            newMovieSearchResponse(title, link, TvType.Movie) {
+                addPoster(posterUrl)
+                if (quality != null) {
+                    addQuality(quality)
+                }
+            }
+        } else {
+            newTvSeriesSearchResponse(title, link, TvType.TvSeries) {
+                addPoster(posterUrl)
+                if (quality != null) {
+                    addQuality(quality)
+                }
+            }
         }
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val page = app.get(url, interceptor = interceptor)
-        val document = page.document
-        val type = if (document.select("div.seasons-wraper").isNotEmpty()){TvType.TvSeries} else{TvType.Movie}
-        val title = document.selectFirst("div.data > h1")!!.text().substringBefore("(").substringBefore("[")
-        val description = document.selectFirst("div#info")?.selectFirst("p")?.html()
-        val rating = document.select("span.valor").last()?.text()?.split(" ")?.get(0)
-        var year = document.selectFirst(" div.data > div.extra > span.date")!!.text().substringAfter(",")
-            .filter { it.isDigit() }
-        if (year.length > 4) {
-            year = year.dropLast(4)
-        }
+        val document = app.get(url, referer = mainUrl).document
+        val type =
+            if (document.select("div.seasons-wraper").isNotEmpty()) TvType.TvSeries
+            else TvType.Movie
 
-        val poster = document.selectFirst("div.poster > img")!!.attr("src")
-
-        val recomm = document.select("article.w_item_b").map {
-            val href = it.selectFirst("a")!!.attr("href")
-            val posterUrl = it.selectFirst("img")!!.attr("src")
-            val name = it.selectFirst("div.data > h3")!!.text().substringBeforeLast("(").substringBeforeLast("[")
-            MovieSearchResponse(
-                name,
-                href,
-                this.name,
-                TvType.Movie,
-                posterUrl
-            )
-
-        }
-
-
+        val title =
+            fixTitle(document.selectFirst("div.data > h1"))
+        val description =
+            document.selectFirst("div#info")
+                ?.text()
+                ?.substringAfter(".")
+                ?.substringBefore("Leggi anche")
+        val year =
+            document.selectFirst("b.variante>strong>a")
+                ?.text()
+                ?.substringBefore("-")
+                ?.substringAfter(",")
+                ?.filter { it.isDigit() }
+        val poster = document.selectFirst("div.poster>img")?.attr("src")
+        val rating = document.selectFirst("span.valor>strong")?.text()?.toRatingInt()
+        val trailer =
+            document.selectFirst("img.youtube__img")
+                ?.attr("src")
+                ?.substringAfter("vi/")
+                ?.substringBefore("/")
+                ?.let { "https://www.youtube.com/watch?v=$it" }
+        val recomm = document.select("article.w_item_b").map { it.toRecommendResult() }
         if (type == TvType.TvSeries) {
-
-            val episodeList = ArrayList<Episode>()
-            document.selectFirst("div.seasons-wraper")
-                ?.select("div.accordion-item ")?.groupBy {it.selectFirst("span.season-title")!!.text()  }?.map { seasons ->
-                    seasons.value.map {season -> season.select("div.episode-wrap")}.flatten()
-                        .groupBy { it.selectFirst("li.season-no")?.text()?.substringBeforeLast(" ") }
-                        .map { episodeItaSub ->
-                            val episodes = episodeItaSub.value
-                            val posterUrl = episodes.firstNotNullOf { it.selectFirst("img")?.attr("src")}
-                            val epName = episodes.firstNotNullOf{it.selectFirst("li.other_link")?.text()?:""}
-
-                            episodes.map{ episode ->
-                                val seasonNo =  episode.selectFirst("li.season-no")
-                                val subtag = seasonNo?.text()?.takeIf {it.contains("Sub")}?.substringAfter(" ") ?: ""
-                                val urls = episode.getElementsByAttributeValue("target", "_blank").map { it.attr("href").trim() }
-                                    .filter { it.isNotEmpty()}.toJson()
-                                episodeList.add(Episode(
-                                    data = urls,
-                                    posterUrl = posterUrl,
-                                    season = seasons.key.toIntOrNull(),
-                                    name = "$epName ${subtag.uppercase()}",
-                                    episode = seasonNo?.text()?.substringAfter("x")?.filter { it.isDigit() }?.toIntOrNull()
-
-                                ))
-                            }
+            val episodeList =
+                document.select("div.accordion>div.accordion-item")
+                    .map { element ->
+                        val season =
+                            element.selectFirst("li.s_title>span.season-title")
+                                ?.text()
+                                ?.toIntOrNull()
+                                ?: 0
+                        element.select("div.episode-wrap").map { episode ->
+                            episode.toEpisode(season)
                         }
-                }
+                    }
+                    .flatten()
 
-
-            val seasonnames = document.selectFirst("div#info")?.select("p")?.map {it.children() }
-                ?.filter { it.size<3 && it.isNotEmpty()}?.map{it.text()}
-
-            return newTvSeriesLoadResponse(
-                title,
-                url,
-                type,
-                episodeList
-            ){
-                addRating(rating)
+            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodeList) {
+                this.year = year?.toIntOrNull()
                 this.plot = description
-                this.year = year.toIntOrNull()
-                this.posterUrl = poster
                 this.recommendations = recomm
-                this.seasonNames = seasonnames!!.mapIndexed { index, s -> SeasonData(index, s) }
-
+                addPoster(poster)
+                addRating(rating)
+                addTrailer(trailer)
             }
-
-
         } else {
             val actors: List<ActorData> =
-                document.select("div.cast_wraper > ul > li").map { actorData ->
-                    val actorName = actorData.children()[1].text()
-                    val actorImage : String? = actorData.selectFirst("img")?.attr("data-src")
-                    val roleActor = actorData.children()[2].text()
-                    ActorData(actor = Actor(actorName, image = actorImage), roleString = roleActor )
+                document.select("div.cast_wraper>ul>li").map { actordata ->
+                    val actorName = actordata.selectFirst("strong")?.text() ?: ""
+                    val actorImage: String =
+                        actordata.selectFirst("figure>img")?.attr("src") ?: ""
+                    ActorData(actor = Actor(actorName, image = actorImage))
                 }
-            return newMovieLoadResponse(
-                title,
-                url,
-                type,
-                (document.select("div.embed-player") + document.select("a.link_a")).map { (it.attr("href") + it.attr("data-id")).trim() }.distinct().toJson(),
-            ) {
-                posterUrl = fixUrlNull(poster)
-                this.year = year.toIntOrNull()
+            val data = document.select(".embed-player").map { it.attr("data-id") }.toJson()
+            return newMovieLoadResponse(title, data, TvType.Movie, data) {
+                this.year = year?.toIntOrNull()
                 this.plot = description
-                addRating(rating)
-                this.recommendations = recomm
-                this.duration = null
                 this.actors = actors
+                this.recommendations = recomm
+                addPoster(poster)
+                addRating(rating)
+                addTrailer(trailer)
             }
         }
+    }
+
+    private fun Element.toRecommendResult(): SearchResponse {
+        val title =
+            fixTitle(this.selectFirst("div.data>h3"))
+        val isMovie =
+            (this.selectFirst("div.data>h3")?.text() ?: "").contains("\\(\\d{4}\\)".toRegex())
+        val link =
+            this.selectFirst("a")?.attr("href") ?: throw ErrorLoadingException("No Link found")
+
+        val quality =
+            this.selectFirst("div.data>h3")?.text()?.substringAfter("[")?.substringBefore("]")
+        val posterUrl = this.selectFirst("div.image>img")?.attr("src")
+
+        return if (isMovie) {
+            newMovieSearchResponse(title, link, TvType.Movie) {
+                addPoster(posterUrl)
+                if (quality != null) {
+                    addQuality(quality)
+                }
+            }
+        } else {
+            newTvSeriesSearchResponse(title, link, TvType.TvSeries) {
+                addPoster(posterUrl)
+                if (quality != null) {
+                    addQuality(quality)
+                }
+            }
+        }
+    }
+
+    private fun Element.toEpisode(season: Int): Episode {
+        val data =
+            this.select("div.fix-table>table>tbody>tr>td>a[target=_blank]") // buckler.link
+                .map { it.attr("href") }
+                .toJson()
+        val epNum =
+            this.selectFirst("li.season-no")
+                ?.text()
+                ?.substringAfter("x")
+                ?.substringBefore(" ")
+                ?.filter { it.isDigit() }
+                .orEmpty().ifBlank { "0" }
+
+        val epTitle =
+            this.selectFirst("li.other_link>a")?.text().orEmpty().ifBlank {
+                "Episodio $epNum"
+            }
+        val posterUrl = this.selectFirst("img")?.attr("src")
+        return Episode(data, epTitle, season, epNum?.toInt(), posterUrl = posterUrl)
     }
 
     override suspend fun loadLinks(
@@ -182,10 +241,8 @@ class IlGenioDelloStreamingProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val links = tryParseJson<List<String>>(data)
-        links?.map { link ->
-            val url = ShortLink.unshorten(link).replace("/v/", "/e/").replace("/f/", "/e/")
-            loadExtractor(url, data, subtitleCallback, callback)
+        parseJson<List<String>>(data).map { videoUrl ->
+            loadExtractor(unshorten(videoUrl), data, subtitleCallback, callback)
         }
         return true
     }
