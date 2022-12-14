@@ -12,7 +12,6 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ShortLink.unshorten
 import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Element
-import android.util.Log
 
 class CasaCinemaProvider : MainAPI() { // all providers must be an instance of MainAPI
     override var mainUrl = "https://casacinema.lol/"
@@ -28,6 +27,21 @@ class CasaCinemaProvider : MainAPI() { // all providers must be an instance of M
             "$mainUrl/category/serie-tv/page/" to "Ultime Serie Tv",
             "$mainUrl/category/film/page/" to "Ultimi Film",
         )
+
+    private fun fixTitle(element: Element?): String {
+        return element?.text()
+            ?.trim()
+            ?.substringBefore("Streaming")
+            ?.replace("[HD]", "")
+            ?.replace("\\(\\d{4}\\)".toRegex(), "")
+            ?: "No Title found"
+    }
+
+    private fun Element?.isMovie(): Boolean {
+        return (this
+            ?.text() ?: "")
+            .contains("\\(\\d{4}\\)".toRegex())
+    }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
 
@@ -55,7 +69,7 @@ class CasaCinemaProvider : MainAPI() { // all providers must be an instance of M
                 ?.replace("[HD]", "")
                 ?.replace("\\(\\d{4}\\)".toRegex(), "")
                 ?: "No title"
-        val isMovie = (this.selectFirst(".title")?.text() ?: "").contains("\\(\\d{4}\\)".toRegex())
+        val isMovie = this.selectFirst(".title").isMovie()
         val link =
             this.selectFirst("a")?.attr("href") ?: throw ErrorLoadingException("No Link found")
 
@@ -81,12 +95,7 @@ class CasaCinemaProvider : MainAPI() { // all providers must be an instance of M
             if (document.select("div.seasons-wraper").isNotEmpty()) TvType.TvSeries
             else TvType.Movie
         val title =
-            document.selectFirst("div.row > h1")
-                ?.text()
-                ?.trim()
-                ?.replace("[HD]", "")
-                ?.replace("\\(\\d{4}\\)".toRegex(), "")
-                ?: "No Title found"
+            fixTitle(document.selectFirst("div.row > h1"))
         val description = document.select("div.element").last()?.text()
         val year = document.selectFirst("div.element>a.tag")
             ?.text()
@@ -190,7 +199,7 @@ class CasaCinemaProvider : MainAPI() { // all providers must be an instance of M
                 "Episodio $epNum"
             }
         val posterUrl = this.selectFirst("figure>img")?.attr("src")
-        return Episode(data, epTitle, season, epNum?.toInt(), posterUrl = posterUrl)
+        return Episode(data, epTitle, season, epNum.toInt(), posterUrl = posterUrl)
     }
 
 
