@@ -310,7 +310,7 @@ object SoraItalianExtractor : SoraItalianStream() {
                     val link = response.select("a.bottone-ep")
                         .find { it.text().substringAfter("Episodio ") == episode.toString() }
                         ?.attr("href")
-                    if (link?.isBlank() == true) { //links exists
+                    if (link?.isBlank() == false) { //links exists
                         val page = app.get(link).document
                         val episodeLink = page.select("div.card-body > a[href*=watch]").attr("href")
                             ?: throw ErrorLoadingException("No link Found")
