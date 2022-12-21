@@ -1,5 +1,5 @@
 // use an integer for version numbers
-version = 1
+version = 2
 
 
 cloudstream {
@@ -7,7 +7,7 @@ cloudstream {
     // All of these properties are optional, you can safely remove them
 
     description = "Provider che utilizza tmdb. Non tutti i links sono funzionanti"
-    authors = listOf("Adippe")
+    authors = listOf("Adippe", "Forthe")
 
     /**
      * Status int as the following:

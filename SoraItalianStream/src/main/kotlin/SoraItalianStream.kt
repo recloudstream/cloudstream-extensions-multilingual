@@ -5,7 +5,6 @@ import com.lagradost.SoraItalianExtractor.invoGuardare
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.metaproviders.TmdbProvider
-import com.lagradost.SoraItalianExtractor.invoAltadefinizione
 import com.lagradost.SoraItalianExtractor.invoAniPlay
 import com.lagradost.SoraItalianExtractor.invoAnimeSaturn
 import com.lagradost.SoraItalianExtractor.invoAnimeWorld
@@ -37,8 +36,9 @@ open class SoraItalianStream : TmdbProvider() {
         private const val apiKey = "71f37e6dff3b879fa4656f19547c418c" // PLEASE DON'T STEAL
         const val guardaserieUrl = "https://guardaserie.app"
         const val filmpertuttiUrl = "https://www.filmpertutti.skin"
-        const val altadefinizioneUrl = "https://altadefinizione01.autos"
-        const val cb01Url = "https://cb01.delivery"
+
+        //        const val altadefinizioneUrl = "https://altadefinizione01.autos"
+        const val cb01Url = "https://cb01.tours/"
         const val animeworldUrl = "https://www.animeworld.tv"
         const val aniplayUrl = "https://aniplay.it"
         const val animesaturnUrl = "https://www.animesaturn.in"
@@ -67,6 +67,12 @@ open class SoraItalianStream : TmdbProvider() {
 
         fun base64DecodeAPI(api: String): String {
             return api.chunked(4).map { base64Decode(it) }.reversed().joinToString("")
+        }
+
+        fun containsJapaneseCharacters(str: String?): Boolean { //sometimes the it-It translation of names gives the japanese name of the anime
+            val japaneseCharactersRegex =
+                Regex("[\\u3000-\\u303f\\u3040-\\u309f\\u30a0-\\u30ff\\uff00-\\uff9f\\u4e00-\\u9faf\\u3400-\\u4dbf]")
+            return str?.let { japaneseCharactersRegex.containsMatchIn(it) } == true
         }
 
     }
@@ -119,22 +125,13 @@ open class SoraItalianStream : TmdbProvider() {
     }
 
 
-    override suspend fun search(query: String): List<SearchResponse> {
-        val searchResponse = mutableListOf<SearchResponse>()
-
-        val mainResponse = app.get(
+    override suspend fun search(query: String): List<SearchResponse>? {
+        return app.get(
             "$tmdbAPI/search/multi?api_key=$apiKey&language=it-IT&query=$query&page=1&include_adult=false"
-        ).parsedSafe<Results>()?.results?.mapNotNull { media ->
-            media.toSearchResponse()
-        }
-        if (mainResponse?.isNotEmpty() == true) searchResponse.addAll(mainResponse)
-
-//        val animeResponse =
-//            app.get("$mainServerAPI/search/anime/$query?_data=routes/search/anime/\$animeKeyword")
-//                .parsedSafe<SearchAnime>()?.searchResults?.results?.mapNotNull { anime -> anime.toSearchResponse() }
-//        if (animeResponse?.isNotEmpty() == true) searchResponse.addAll(animeResponse)
-
-        return searchResponse
+        )
+            .parsedSafe<Results>()?.results?.mapNotNull { media ->
+                media.toSearchResponse()
+            }
     }
 
 
@@ -143,16 +140,16 @@ open class SoraItalianStream : TmdbProvider() {
 
         val type = getType(data.type)
 
-        val typename = when(type){
-            TvType.TvSeries-> "tv"
-            TvType.Movie -> "movie"
-            else -> ""
-        }
+        val typename = data.type
 
-        val res =
+        var res =
             app.get("$tmdbAPI/$typename/${data.id}?api_key=$apiKey&language=it-IT&append_to_response=external_ids,credits,recommendations,videos")
                 .parsedSafe<MovieDetails>() ?: throw ErrorLoadingException("Invalid Json Response")
-
+        if (containsJapaneseCharacters(res.name)) {
+            res =
+                app.get("$tmdbAPI/$typename/${data.id}?api_key=$apiKey&language=en-US&append_to_response=external_ids,credits,recommendations,videos")
+                    .parsedSafe() ?: throw ErrorLoadingException("Invalid Json Response")
+        }
 
         val title = res.name ?: res.title ?: return null
         val orgTitle = res.originalName ?: res.originalTitle ?: return null
@@ -175,81 +172,64 @@ open class SoraItalianStream : TmdbProvider() {
             res.videos?.results?.map { "https://www.youtube.com/watch?v=${it.key}" }
                 ?.randomOrNull()
 
-        if (res.genres?.map { it.id }?.contains(16) == true && type == TvType.TvSeries) {
+        val isAnime = res.genres?.map { it.id }?.contains(16) == true
 
-            val episodes = mutableListOf<Episode>()
-            res.seasons?.filter { it.seasonNumber != 0L }?.apmap { season ->
-                val seasonData = app.get("$tmdbAPI/${data.type}/${data.id}/season/${season.seasonNumber}?api_key=$apiKey&language=it-IT")
-                    .parsedSafe<MediaDetailEpisodes>()?.episodes
-                val seasonID = if (season.seasonNumber!! > 1 && seasonData?.isNotEmpty() == true && seasonData?.first()?.episodeNumber != 1){ 1 } else { season.seasonNumber }.toInt()
-                    seasonData?.map { eps ->
-                        episodes.add(Episode(
-                            LinkData(
-                                data.id,
-                                res.externalIds?.imdbId,
-                                data.type,
-                                seasonID,
-                                eps.episodeNumber,
-                                title = title,
-                                year = year,
-                                orgTitle = orgTitle,
-                                isAnime = true
-                            ).toJson(),
-                            name = eps.name,
-                            season = eps.seasonNumber,
-                            episode = eps.episodeNumber,
-                            posterUrl = getImageUrl(eps.stillPath),
-                            rating = eps.voteAverage?.times(10)?.roundToInt(),
-                            description = eps.overview
-                        ).apply {
-                            this.addDate(eps.airDate)
-                        })
-                    }
-            }
-            return newTvSeriesLoadResponse(
+        return if (type == TvType.Movie) { //can be a movie or a anime movie
+            newMovieLoadResponse(
                 title,
                 url,
-                TvType.TvSeries,
-                episodes
+                TvType.Movie,
+                LinkData(
+                    data.id,
+                    res.externalIds?.imdbId,
+                    data.type,
+                    title = title,
+                    year = year,
+                    orgTitle = orgTitle,
+                    isAnime = isAnime
+                ).toJson(),
             ) {
                 this.posterUrl = getOriImageUrl(res.backdropPath)
                 this.year = year
                 this.plot = res.overview
                 this.tags = res.genres?.mapNotNull { it.name }
-                this.showStatus = getStatus(res.status)
                 this.recommendations = recommendations
                 this.actors = actors
                 addTrailer(trailer)
             }
-
-        }
-        return if (type == TvType.TvSeries) {
+        } else { //can be anime series or tv series
             val episodes = mutableListOf<Episode>()
-            res.seasons?.filter { it.seasonNumber != 0L }?.apmap { season ->
-                app.get("$tmdbAPI/${data.type}/${data.id}/season/${season.seasonNumber}?api_key=$apiKey&language=it-IT")
-                    .parsedSafe<MediaDetailEpisodes>()?.episodes?.map { eps ->
-                        episodes.add(Episode(
-                            LinkData(
-                                data.id,
-                                res.externalIds?.imdbId,
-                                data.type,
-                                eps.seasonNumber,
-                                eps.episodeNumber,
-                                title = title,
-                                year = season.airDate?.split("-")?.first()?.toIntOrNull(),
-                                orgTitle = orgTitle,
-                                isAnime = false
-                            ).toJson(),
-                            name = eps.name,
-                            season = eps.seasonNumber,
-                            episode = eps.episodeNumber,
-                            posterUrl = getImageUrl(eps.stillPath),
-                            rating = eps.voteAverage?.times(10)?.roundToInt(),
-                            description = eps.overview
-                        ).apply {
-                            this.addDate(eps.airDate)
-                        })
-                    }
+            var seasonNum = 0
+            res.seasons?.filter { it.seasonNumber != 0 }?.map { season ->
+                val seasonData =
+                    app.get("$tmdbAPI/${data.type}/${data.id}/season/${season.seasonNumber}?api_key=$apiKey&language=it-IT")
+                        .parsedSafe<MediaDetailEpisodes>()?.episodes
+                if (seasonData?.first()?.episodeNumber == 1)
+                    seasonNum += 1
+
+                seasonData?.map { eps ->
+                    episodes.add(Episode(
+                        LinkData(
+                            data.id,
+                            res.externalIds?.imdbId,
+                            data.type,
+                            seasonNum,
+                            eps.episodeNumber,
+                            title = title,
+                            year = year ?: season.airDate?.split("-")?.first()?.toIntOrNull(),
+                            orgTitle = orgTitle,
+                            isAnime = isAnime
+                        ).toJson(),
+                        name = eps.name,
+                        season = seasonNum,
+                        episode = eps.episodeNumber,
+                        posterUrl = getImageUrl(eps.stillPath),
+                        rating = eps.voteAverage?.times(10)?.roundToInt(),
+                        description = eps.overview
+                    ).apply {
+                        this.addDate(eps.airDate)
+                    })
+                }
             }
             newTvSeriesLoadResponse(
                 title,
@@ -262,30 +242,6 @@ open class SoraItalianStream : TmdbProvider() {
                 this.plot = res.overview
                 this.tags = res.genres?.mapNotNull { it.name }
                 this.showStatus = getStatus(res.status)
-                this.recommendations = recommendations
-                this.actors = actors
-                addTrailer(trailer)
-            }
-        }
-        else {
-            newMovieLoadResponse(
-                title,
-                url,
-                TvType.Movie,
-                LinkData(
-                    data.id,
-                    res.externalIds?.imdbId,
-                    data.type,
-                    title = title,
-                    year = year,
-                    orgTitle = orgTitle,
-                    isAnime = res.genres?.map { it.id }?.contains(16)?:false
-                ).toJson(),
-            ) {
-                this.posterUrl = getOriImageUrl(res.backdropPath)
-                this.year = year
-                this.plot = res.overview
-                this.tags = res.genres?.mapNotNull { it.name }
                 this.recommendations = recommendations
                 this.actors = actors
                 addTrailer(trailer)
@@ -304,28 +260,60 @@ open class SoraItalianStream : TmdbProvider() {
         val malID = app.get("$tmdb2mal/?id=${res.id}&s=${res.season}").text.trim()
         argamap(
             {
-                if (res.isAnime ) invoAnimeWorld(malID, res.title, res.episode, subtitleCallback, callback)
+                if (res.isAnime) invoAnimeWorld(
+                    malID,
+                    res.title,
+                    res.episode,
+                    callback
+                )
             },
             {
-                if (res.isAnime) invoAniPlay(malID, res.title, res.episode, res.year, subtitleCallback, callback)
+                if (res.isAnime) invoAniPlay(
+                    malID,
+                    res.title,
+                    res.episode,
+                    res.year,
+                    callback
+                )
             },
             {
-                if (res.isAnime) invoAnimeSaturn(malID, res.title, res.episode, subtitleCallback, callback)
+                if (res.isAnime) invoAnimeSaturn(
+                    malID,
+                    res.title,
+                    res.episode,
+                    callback
+                )
             },
             {
-                invoGuardare(res.imdbId, subtitleCallback, callback)
+                if (res.type == "movie") invoGuardare(
+                    res.imdbId,
+                    subtitleCallback,
+                    callback
+                ) //just movies/anime movie
             },
             {
-                if (malID == "") invoGuardaserie(res.imdbId, res.season, res.episode, subtitleCallback, callback)
+                if (res.type == "tv") invoGuardaserie( //has tv series and anime
+                    res.imdbId,
+                    res.season,
+                    res.episode,
+                    subtitleCallback,
+                    callback
+                )
             },
             {
-                if (!res.isAnime) invoFilmpertutti(res.imdbId,res.title, res.type, res.season, res.episode, res.year, subtitleCallback, callback)
+                invoFilmpertutti( //has tv series, film and some anime
+                    res.imdbId,
+                    res.title,
+                    res.type,
+                    res.season,
+                    res.episode,
+                    res.year,
+                    subtitleCallback,
+                    callback
+                )
             },
             {
-                if (!res.isAnime) invoAltadefinizione(res.imdbId, subtitleCallback, callback)
-            },
-            {
-                if (!res.isAnime) invoCb01(res.title, res.year, subtitleCallback, callback)
+                if (res.type == "movie") invoCb01(res.title, res.year, subtitleCallback, callback)
             }
         )
 
@@ -335,7 +323,7 @@ open class SoraItalianStream : TmdbProvider() {
     private data class LinkData(
         val id: Int? = null,
         val imdbId: String? = null,
-        val type: String? = null,
+        val type: String? = null, //movie or tv
         val season: Int? = null,
         val episode: Int? = null,
         val aniId: String? = null,
@@ -343,7 +331,7 @@ open class SoraItalianStream : TmdbProvider() {
         val title: String? = null,
         val year: Int? = null,
         val orgTitle: String? = null,
-        val isAnime : Boolean
+        val isAnime: Boolean
     )
 
     data class Data(
@@ -415,7 +403,7 @@ open class SoraItalianStream : TmdbProvider() {
     )
 
 
-    data class MovieDetails (
+    data class MovieDetails(
         val adult: Boolean? = null,
         @JsonProperty("first_air_date") val tvDate: String? = null,
         @JsonProperty("release_date") val movieDate: String? = null,
@@ -442,19 +430,19 @@ open class SoraItalianStream : TmdbProvider() {
         @JsonProperty("external_ids") val externalIds: ExternalIds? = null
     )
 
-    data class Recommendations (
+    data class Recommendations(
         @JsonProperty("results") val results: List<Media>? = null,
     )
 
-    data class Credits (
+    data class Credits(
         val cast: List<Cast>? = null,
     )
 
-    data class ExternalIds (
+    data class ExternalIds(
         @JsonProperty("imdb_id") val imdbId: String? = null
     )
 
-    data class Videos (
+    data class Videos(
         val results: List<Trailers>? = null,
     )
 
@@ -462,19 +450,19 @@ open class SoraItalianStream : TmdbProvider() {
         @JsonProperty("key") val key: String? = null,
     )
 
-    data class Genre (
+    data class Genre(
         val id: Long? = null,
         val name: String? = null
     )
 
-    data class Season (
+    data class Season(
         @JsonProperty("air_date") val airDate: String? = null,
-        @JsonProperty("episode_count") val episodeCount: Long? = null,
+        @JsonProperty("episode_count") val episodeCount: Int? = null,
         val id: Long? = null,
         val name: String? = null,
         val overview: String? = null,
         @JsonProperty("poster_path") val posterPath: String? = null,
-        @JsonProperty("season_number") val seasonNumber: Long? = null
+        @JsonProperty("season_number") val seasonNumber: Int? = null
     )
 
     data class AnimeWorldJson(
@@ -482,29 +470,35 @@ open class SoraItalianStream : TmdbProvider() {
         @JsonProperty("name") val name: String,
         @JsonProperty("target") val target: String,
     )
+
     data class AniPlayApiSearchResult(
         @JsonProperty("id") val id: Int,
         @JsonProperty("listWebsites") val websites: List<AniPlayWebsites>
     )
+
     data class AniPlayWebsites(
-         @JsonProperty("url") val url: String? = null,
-         @JsonProperty("listWebsiteId") val websitesId: Int? = null
+        @JsonProperty("url") val url: String? = null,
+        @JsonProperty("listWebsiteId") val websitesId: Int? = null
     )
+
     data class AniplayApiAnime(
         @JsonProperty("episodes") val episodes: List<AniplayApiEpisode>,
         @JsonProperty("seasons") val seasons: List<AniplayApiSeason>?,
         @JsonProperty("title") val title: String?
     )
+
     data class AniplayApiEpisode(
         @JsonProperty("id") val id: Int,
         @JsonProperty("title") val title: String?,
         @JsonProperty("episodeNumber") val number: String,
     )
+
     data class AniplayApiSeason(
         @JsonProperty("id") val id: Int,
         @JsonProperty("name") val name: String,
         @JsonProperty("episodeStart") val episodeStart: Int
     )
+
     data class AniPlayApiEpisodeUrl(
         @JsonProperty("videoUrl") val url: String
     )
