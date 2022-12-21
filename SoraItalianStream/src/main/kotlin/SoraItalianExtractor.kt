@@ -25,7 +25,6 @@ object SoraItalianExtractor : SoraItalianStream() {
                 subtitleCallback,
                 callback
             )
-            println("LINK DI Guardare " + fixUrl(source.attr("data-link")))
         }
     }
 
@@ -55,7 +54,6 @@ object SoraItalianExtractor : SoraItalianStream() {
                             subtitleCallback,
                             callback
                         )
-                        println("LINK DI guardaserie  " + it.attr("data-link"))
                     }
                 }
             }
@@ -113,7 +111,6 @@ object SoraItalianExtractor : SoraItalianStream() {
                                 subtitleCallback,
                                 callback
                             )
-                            println("LINK DI Filmpertutti Series $unshortenLink")
                         }
                 } else { //movie
                     doc.select("#info > ul > li").mapNotNull {
@@ -124,7 +121,6 @@ object SoraItalianExtractor : SoraItalianStream() {
                             subtitleCallback,
                             callback
                         )
-                        println("LINK DI Filmpertutti Movies $unshortenLink")
                     }
                 }
             }
@@ -147,14 +143,14 @@ object SoraItalianExtractor : SoraItalianStream() {
             val doc = app.get(it).document
             doc.select("tr > td > a[href*='stayonline.pro']").mapNotNull {
                 val link = it.selectFirst("a")?.attr("href") ?: ""
-                val idPost = link.substringAfter("/l/")
+                val apiPostId = link.substringAfter("/l/")
                     .substringBefore("/")  //https://stayonline.pro/l/abcdef/ -> abcdef
-                val doc2 = app.post(
+                val apiBodyBypass = app.post(
                     "https://stayonline.pro/ajax/linkView.php",
-                    data = mapOf("id" to idPost)
+                    data = mapOf("id" to apiPostId)
                 ).text
                 var url2 =
-                    doc2.substringAfter("\"value\": \"").substringBefore("\"")
+                    apiBodyBypass.substringAfter("\"value\": \"").substringBefore("\"")
                         .replace("\\", "") //bypass stayonline link
 
                 if (url2.contains("mixdrop.club")) //https://mixdrop.club/f/lllllllll/2/abcdefghilmn.mp4 (fake mp4 url) -> https://mixdrop.ch/e/lllllllll
@@ -170,7 +166,6 @@ object SoraItalianExtractor : SoraItalianStream() {
                     subtitleCallback,
                     callback
                 )
-                println("LINK DI CB01 $url2")
             }
 
         }
@@ -220,7 +215,6 @@ object SoraItalianExtractor : SoraItalianStream() {
                                 quality = Qualities.Unknown.value
                             )
                         )
-                        println("LINK DI Animeworld  $url")
                     }
             }
         }
@@ -260,7 +254,6 @@ object SoraItalianExtractor : SoraItalianStream() {
                         isM3u8 = streamUrl.contains(".m3u8"),
                     )
                 )
-                println("LINK DI aniplay $streamUrl")
             } else {
                 val seasonid = response.seasons.sortedBy { it.episodeStart }
                     .last { it.episodeStart < episode!! }
@@ -284,7 +277,6 @@ object SoraItalianExtractor : SoraItalianStream() {
                             isM3u8 = streamUrl.contains(".m3u8"),
                         )
                     )
-                    println("LINK DI aniplay $streamUrl")
                 }
             }
         }
@@ -297,7 +289,6 @@ object SoraItalianExtractor : SoraItalianStream() {
         episode: Int?,
         callback: (ExtractorLink) -> Unit
     ) {
-        print("Animesaturn started to scrape")
         val document =
             app.get("$animesaturnUrl/animelist?search=${title?.replace("-", " ")}").document
         val links = document.select("div.item-archivio").map {
@@ -312,32 +303,30 @@ object SoraItalianExtractor : SoraItalianStream() {
             }
             var malID: String?
 
-            response.select("a[href*=myanimelist]").map {
+            response.select("a[href*=myanimelist]").forEach {
                 malID = it.attr("href").substringBeforeLast("/")
                     .substringAfterLast("/") //https://myanimelist.net/anime/19/ -> 19
                 if (malId == malID) {
                     val link = response.select("a.bottone-ep")
                         .find { it.text().substringAfter("Episodio ") == episode.toString() }
                         ?.attr("href")
-                    if (link?.isBlank() == false) { //links exists
+                    if (link?.isBlank() == true) { //links exists
                         val page = app.get(link).document
                         val episodeLink = page.select("div.card-body > a[href*=watch]").attr("href")
                             ?: throw ErrorLoadingException("No link Found")
 
                         val episodePage = app.get(episodeLink).document
-                        var episodeUrl: String?
-                        episodePage.select("video.afterglow > source")
-                            .also { // Old player
-                                episodeUrl = it.first()?.attr("src")
+                        val episodeUrl: String? = episodePage.select("video.afterglow > source")
+                            .let { // Old player
+                                it.first()?.attr("src")
                             }
                             ?: run { //new player
-                                episodeUrl = Regex("\"(https[A-z0-9\\/\\:\\.]*\\.m3u8)\",").find(
+                                Regex("\"(https[A-z0-9\\/\\:\\.]*\\.m3u8)\",").find(
                                     episodePage.select("script").find {
                                         it.toString().contains("jwplayer('player_hls').setup({")
                                     }.toString()
                                 )?.value
                             }
-
                         callback.invoke(
                             ExtractorLink(
                                 name,
@@ -348,7 +337,6 @@ object SoraItalianExtractor : SoraItalianStream() {
                                 quality = Qualities.Unknown.value
                             )
                         )
-                        println("LINK DI animesaturn $episodeUrl")
                     }
 
                 }
@@ -380,6 +368,4 @@ fun fixUrl(url: String, domain: String): String {
         }
         return "$domain/$url"
     }
-
 }
-
