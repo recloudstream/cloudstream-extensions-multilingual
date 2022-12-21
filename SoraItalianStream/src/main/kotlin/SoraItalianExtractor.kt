@@ -332,7 +332,7 @@ object SoraItalianExtractor : SoraItalianStream() {
                                 name,
                                 AnimeName,
                                 episodeUrl!!,
-                                isM3u8 = episodeUrl!!.contains(".m3u8"),
+                                isM3u8 = episodeUrl.contains(".m3u8"),
                                 referer = "https://www.animesaturn.io/", //Some servers need the old host as referer, and the new ones accept it too
                                 quality = Qualities.Unknown.value
                             )
