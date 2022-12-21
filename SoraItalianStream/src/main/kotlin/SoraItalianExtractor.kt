@@ -320,13 +320,13 @@ object SoraItalianExtractor : SoraItalianStream() {
                             .let { // Old player
                                 it.first()?.attr("src")
                             }
-                            ?: run { //new player
-                                Regex("\"(https[A-z0-9\\/\\:\\.]*\\.m3u8)\",").find(
-                                    episodePage.select("script").find {
-                                        it.toString().contains("jwplayer('player_hls').setup({")
-                                    }.toString()
-                                )?.value
-                            }
+                            ?: //new player
+                            Regex("\"(https[A-z0-9\\/\\:\\.]*\\.m3u8)\",").find(
+                                episodePage.select("script").find {
+                                    it.toString().contains("jwplayer('player_hls').setup({")
+                                }.toString()
+                            )?.value
+
                         callback.invoke(
                             ExtractorLink(
                                 name,
@@ -368,4 +368,5 @@ fun fixUrl(url: String, domain: String): String {
         }
         return "$domain/$url"
     }
+
 }
