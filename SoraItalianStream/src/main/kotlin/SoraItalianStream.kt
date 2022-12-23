@@ -36,8 +36,6 @@ open class SoraItalianStream : TmdbProvider() {
         private const val apiKey = "71f37e6dff3b879fa4656f19547c418c" // PLEASE DON'T STEAL
         const val guardaserieUrl = "https://guardaserie.app"
         const val filmpertuttiUrl = "https://www.filmpertutti.skin"
-
-        //        const val altadefinizioneUrl = "https://altadefinizione01.autos"
         const val cb01Url = "https://cb01.tours/"
         const val animeworldUrl = "https://www.animeworld.tv"
         const val aniplayUrl = "https://aniplay.it"
@@ -172,7 +170,7 @@ open class SoraItalianStream : TmdbProvider() {
             res.videos?.results?.map { "https://www.youtube.com/watch?v=${it.key}" }
                 ?.randomOrNull()
 
-        val isAnime = res.genres?.map { it.id }?.contains(16) == true
+        val isAnime = res.genres?.any { it.id == 16L } == true
 
         return if (type == TvType.Movie) { //can be a movie or a anime movie
             newMovieLoadResponse(
@@ -200,14 +198,17 @@ open class SoraItalianStream : TmdbProvider() {
         } else { //can be anime series or tv series
             val episodes = mutableListOf<Episode>()
             var seasonNum = 0
-            res.seasons?.filter { it.seasonNumber != 0 }?.map { season ->
-                val seasonData =
-                    app.get("$tmdbAPI/${data.type}/${data.id}/season/${season.seasonNumber}?api_key=$apiKey&language=it-IT")
-                        .parsedSafe<MediaDetailEpisodes>()?.episodes
+            val seasonDataList = res.seasons?.filter { it.seasonNumber != 0 }?.apmap { season ->
+                app.get("$tmdbAPI/${data.type}/${data.id}/season/${season.seasonNumber}?api_key=$apiKey&language=it-IT")
+                    .parsedSafe<MediaDetailEpisodes>()?.episodes
+            }
+
+            res.seasons?.filter { it.seasonNumber != 0 }?.forEachIndexed { index, season ->
+                val seasonData = seasonDataList?.get(index)
                 if (seasonData?.first()?.episodeNumber == 1)
                     seasonNum += 1
 
-                seasonData?.map { eps ->
+                seasonData?.forEach { eps ->
                     episodes.add(Episode(
                         LinkData(
                             data.id,
