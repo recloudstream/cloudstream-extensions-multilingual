@@ -18,10 +18,10 @@ object SoraItalianExtractor : SoraItalianStream() {
             "https://guardahd.stream/movie/$id",
             referer = "/"
         ).document
-        res.select("ul._player-mirrors > li").map { source ->
+        res.select("ul._player-mirrors > li").forEach { source ->
             loadExtractor(
                 fixUrl(source.attr("data-link")),
-                "$/",
+                "https://guardahd.stream",
                 subtitleCallback,
                 callback
             )
@@ -44,13 +44,13 @@ object SoraItalianExtractor : SoraItalianStream() {
         ).document.selectFirst("h2>a")?.attr("href") ?: return
 
         val document = app.get(url).document
-        document.select("div.tab-content > div").mapIndexed { seasonData, data ->
-            data.select("li").mapIndexed { epNum, epData ->
+        document.select("div.tab-content > div").forEachIndexed { seasonData, data ->
+            data.select("li").forEachIndexed { epNum, epData ->
                 if (season == seasonData + 1 && episode == epNum + 1) {
-                    epData.select("div.mirrors > a.mr").map {
+                    epData.select("div.mirrors > a.mr").forEach {
                         loadExtractor(
                             fixUrl(it.attr("data-link")),
-                            "$/",
+                            guardaserieUrl,
                             subtitleCallback,
                             callback
                         )
@@ -103,7 +103,7 @@ object SoraItalianExtractor : SoraItalianStream() {
                     }
 
                     episodeData?.select("#links > div > div > table > tbody:nth-child(2) > tr")
-                        ?.map {
+                        ?.forEach {
                             val unshortenLink = unshorten(it.selectFirst("a")?.attr("href") ?: "")
                             loadExtractor(
                                 unshortenLink,
@@ -113,11 +113,11 @@ object SoraItalianExtractor : SoraItalianStream() {
                             )
                         }
                 } else { //movie
-                    doc.select("#info > ul > li").mapNotNull {
+                    doc.select("#info > ul > li").forEach {
                         val unshortenLink = unshorten(it.selectFirst("a")?.attr("href") ?: "")
                         loadExtractor(
                             unshortenLink,
-                            "$/",
+                            filmpertuttiUrl,
                             subtitleCallback,
                             callback
                         )
@@ -141,7 +141,7 @@ object SoraItalianExtractor : SoraItalianStream() {
 
         links.apmap {
             val doc = app.get(it).document
-            doc.select("tr > td > a[href*='stayonline.pro']").mapNotNull {
+            doc.select("tr > td > a[href*='stayonline.pro']").forEach {
                 val link = it.selectFirst("a")?.attr("href") ?: ""
                 val apiPostId = link.substringAfter("/l/")
                     .substringBefore("/")  //https://stayonline.pro/l/abcdef/ -> abcdef
@@ -149,20 +149,20 @@ object SoraItalianExtractor : SoraItalianStream() {
                     "https://stayonline.pro/ajax/linkView.php",
                     data = mapOf("id" to apiPostId)
                 ).text
-                var url2 =
+                var bypassedUrl =
                     apiBodyBypass.substringAfter("\"value\": \"").substringBefore("\"")
                         .replace("\\", "") //bypass stayonline link
 
-                if (url2.contains("mixdrop.club")) //https://mixdrop.club/f/lllllllll/2/abcdefghilmn.mp4 (fake mp4 url) -> https://mixdrop.ch/e/lllllllll
-                    url2 = url2.replace("mixdrop.club", "mixdrop.ch")
+                if (bypassedUrl.contains("mixdrop.club")) //https://mixdrop.club/f/lllllllll/2/abcdefghilmn.mp4 (fake mp4 url) -> https://mixdrop.ch/e/lllllllll
+                    bypassedUrl = bypassedUrl.replace("mixdrop.club", "mixdrop.ch")
                         .substringBeforeLast("/")
                         .substringBeforeLast("/")
                         .replace("/f/", "/e/")
                 else
-                    url2 = unshorten(url2)
+                    bypassedUrl = unshorten(bypassedUrl)
                 loadExtractor(
-                    url2,
-                    "$/",
+                    bypassedUrl,
+                    cb01Url,
                     subtitleCallback,
                     callback
                 )
@@ -189,7 +189,7 @@ object SoraItalianExtractor : SoraItalianStream() {
                 val servers = document.select(".widget.servers")
                 servers.select(".server[data-name=\"9\"] .episode > a").toList()
                     .filter { it.attr("data-episode-num").toIntOrNull()?.equals(episode) ?: false }
-                    .map { id ->
+                    .forEach { id ->
                         val url = tryParseJson<AnimeWorldJson>(
                             app.get("$animeworldUrl/api/episode/info?id=${id.attr("data-id")}").text
                         )?.grabber
