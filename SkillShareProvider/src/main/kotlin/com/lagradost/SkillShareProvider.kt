@@ -34,11 +34,14 @@ class SkillShareProvider : MainAPI() { // all providers must be an instance of M
 
     private suspend fun queryMovieApi(payload: String): String {
         val req = payload.toRequestBody(RequestBodyTypes.JSON.toMediaTypeOrNull())
-        return app.post(apiUrl, requestBody = req, referer = "$mainUrl/").text
+        return app.post(apiUrl, requestBody = req, referer = "$mainUrl/", timeout = 30).text
     }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val sortAttribute = request.data
+        if (page == 1)
+            cursor[sortAttribute] = ""
+
         val payload =
             """{         "query": "query GetClassesByType(${'$'}filter: ClassFilters!, ${'$'}pageSize: Int, ${'$'}cursor: String, ${'$'}type: ClassListType!, ${'$'}sortAttribute: ClassListByTypeSortAttribute) {             classListByType(type: ${'$'}type, where: ${'$'}filter, first: ${'$'}pageSize, after: ${'$'}cursor, sortAttribute: ${'$'}sortAttribute) {                 nodes {                     id                     title                     url                     sku                     smallCoverUrl                     largeCoverUrl                 }             }         }",         "variables": {             "type": "TRENDING_CLASSES",             "filter": {                 "subCategory": "",                 "classLength": []             },             "pageSize": 30,             "cursor": "${cursor[sortAttribute]}",             "sortAttribute": "$sortAttribute"         },         "operationName": "GetClassesByType"     }"""
         val responseBody = queryMovieApi(payload)
