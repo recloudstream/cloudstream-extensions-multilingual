@@ -39,20 +39,43 @@ class SkillShareProvider : MainAPI() { // all providers must be an instance of M
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val sortAttribute = request.data
-        if (page == 1)
+        if (page == 1) //reset the cursor to "" if the first page is requested
             cursor[sortAttribute] = ""
+        val payload=
+            """
+            {
+                "query":"query GetClassesByType(${'$'}filter: ClassFilters!, ${'$'}pageSize: Int, ${'$'}cursor: String, ${'$'}type: ClassListType!, ${'$'}sortAttribute: ClassListByTypeSortAttribute) {
+                  classListByType(type: ${'$'}type, where: ${'$'}filter, first: ${'$'}pageSize, after: ${'$'}cursor, sortAttribute: ${'$'}sortAttribute) {
+                     nodes {
+                      id
+                      title
+                      url
+                      sku
+                      smallCoverUrl
+                      largeCoverUrl
+                    }
+                  }
+                }",
+                "variables":{
+                    "type":"TRENDING_CLASSES",
+                    "filter":{
+                        "subCategory":"",
+                        "classLength":[]
+                    },
+                    "pageSize":30,
+                    "cursor":"${cursor[sortAttribute]}",
+                    "sortAttribute":"$sortAttribute"
+                },
+                "operationName":"GetClassesByType"
+            }
+            """.replace(Regex("\n")," ")
 
-        val payload =
-            """{         "query": "query GetClassesByType(${'$'}filter: ClassFilters!, ${'$'}pageSize: Int, ${'$'}cursor: String, ${'$'}type: ClassListType!, ${'$'}sortAttribute: ClassListByTypeSortAttribute) {             classListByType(type: ${'$'}type, where: ${'$'}filter, first: ${'$'}pageSize, after: ${'$'}cursor, sortAttribute: ${'$'}sortAttribute) {                 nodes {                     id                     title                     url                     sku                     smallCoverUrl                     largeCoverUrl                 }             }         }",         "variables": {             "type": "TRENDING_CLASSES",             "filter": {                 "subCategory": "",                 "classLength": []             },             "pageSize": 30,             "cursor": "${cursor[sortAttribute]}",             "sortAttribute": "$sortAttribute"         },         "operationName": "GetClassesByType"     }"""
         val responseBody = queryMovieApi(payload)
-        val parsedJson = parseJson<ApiData>(responseBody).data!!.classListByType!!.nodes
+        val parsedJson = parseJson<ApiData>(responseBody).data.classListByType.nodes
         val home = parsedJson.map {
             it.toSearchResult()
         }
-        home.let {
-            cursor[sortAttribute] =
-                parsedJson.last().id.toString()
-        }
+        cursor[sortAttribute] = parsedJson.lastOrNull()?.id ?: "" //set the right cursor for the nextPage to work
         return newHomePageResponse(
             arrayListOf(HomePageList(request.name, home, isHorizontalImages = true)),
             hasNext = home.isNotEmpty(),
@@ -61,10 +84,42 @@ class SkillShareProvider : MainAPI() { // all providers must be an instance of M
 
     override suspend fun search(query: String): List<SearchResponse> {
         val payload =
-            """{"query":"fragment ClassFields on Class {\n  id\n\tsmallCoverUrl\n  largeCoverUrl\n  sku\n  title\n  url\n}\n\nquery GetClassesQuery(${"$"}query: String!, ${"$"}where: SearchFilters!, ${"$"}after: String!, ${"$"}first: Int!) {\n  search(query: ${"$"}query, where: ${"$"}where, analyticsTags: [\"src:browser\", \"src:browser:search\"], after: ${"$"}after, first: ${"$"}first) {\n    edges {\n      node {\n        ...ClassFields\n      }\n    }\n  }\n}\n","variables":{"query":"$query","where":{"level":["ALL_LEVELS","BEGINNER","INTERMEDIATE","ADVANCED"]},"after":"-1","first":30},"operationName":"GetClassesQuery"}"""
+            """
+            {
+                "query":"fragment ClassFields on Class {
+                  id
+                  smallCoverUrl
+                  largeCoverUrl
+                  sku
+                  title
+                  url
+                }
+                
+                query GetClassesQuery(${"$"}query: String!, ${"$"}where: SearchFilters!, ${"$"}after: String!, ${"$"}first: Int!) {
+                  search(query: ${"$"}query, where: ${"$"}where, analyticsTags: [\"src:browser\", \"src:browser:search\"], after: ${"$"}after, first: ${"$"}first) {
+                    edges {
+                      node {
+                        ...ClassFields
+                      }
+                    }
+                  }
+                }",
+                "variables":{
+                    "query":"$query",
+                    "where":{
+                        "level":
+                            ["ALL_LEVELS","BEGINNER","INTERMEDIATE","ADVANCED"]
+                    },
+                    "after":"-1",
+                    "first":30
+                },
+                "operationName":"GetClassesQuery"
+            }
+            """.replace(Regex("\n")," ")
+
         val responseBody = queryMovieApi(payload)
-        val home = parseJson<SearchApiData>(responseBody).data!!.search!!.edges.map {
-            it.node!!.toSearchResult()
+        val home = parseJson<SearchApiData>(responseBody).data.search.edges.map {
+            it.node.toSearchResult()
         }
         return home
     }
@@ -139,19 +194,19 @@ class SkillShareProvider : MainAPI() { // all providers must be an instance of M
 
     data class ApiClassListByType( //mainpage
 
-        @JsonProperty("classListByType") var classListByType: ApiNodes? = ApiNodes()
+        @JsonProperty("classListByType") var classListByType: ApiNodes = ApiNodes()
 
     )
 
     data class ApiData( //mainpage
 
-        @JsonProperty("data") var data: ApiClassListByType? = ApiClassListByType()
+        @JsonProperty("data") var data: ApiClassListByType = ApiClassListByType()
 
     )
 
     data class SearchApiNodes( //search
 
-        @JsonProperty("node") var node: ApiNode? = ApiNode()
+        @JsonProperty("node") var node: ApiNode = ApiNode()
 
     )
 
@@ -163,13 +218,13 @@ class SkillShareProvider : MainAPI() { // all providers must be an instance of M
 
     data class SearchApiSearch( //search
 
-        @JsonProperty("search") var search: SearchApiEdges? = SearchApiEdges()
+        @JsonProperty("search") var search: SearchApiEdges = SearchApiEdges()
 
     )
 
     data class SearchApiData( //search
 
-        @JsonProperty("data") var data: SearchApiSearch? = SearchApiSearch()
+        @JsonProperty("data") var data: SearchApiSearch = SearchApiSearch()
 
     )
 
