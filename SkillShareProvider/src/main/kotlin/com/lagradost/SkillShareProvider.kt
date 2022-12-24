@@ -9,24 +9,22 @@ import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.AppUtils.toJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.Qualities
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
+import com.lagradost.nicehttp.RequestBodyTypes
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
 
 class SkillShareProvider : MainAPI() { // all providers must be an instance of MainAPI
     override var mainUrl = "https://www.skillshare.com"
     override var name = "SkillShare"
 
-    val apiUrl = "https://www.skillshare.com/api/graphql"
-    val bypassApiUrl = "https://skillshare-api.heckernohecking.repl.co"
+    private val apiUrl = "https://www.skillshare.com/api/graphql"
+    private val bypassApiUrl = "https://skillshare-api.heckernohecking.repl.co"
 
     override val supportedTypes = setOf(TvType.TvSeries)
     override val hasChromecastSupport = true
     override var lang = "en"
     override val hasMainPage = true
-    val client = OkHttpClient()
-    var cursor = ""
+    private var cursor = mutableMapOf("SIX_MONTHS_ENGAGEMENT" to "", "ML_TRENDINESS" to "")
 
     override val mainPage =
         mainPageOf(
@@ -34,24 +32,22 @@ class SkillShareProvider : MainAPI() { // all providers must be an instance of M
             "ML_TRENDINESS" to "Trending Classes",
         )
 
+    private suspend fun queryMovieApi(payload: String): String {
+        val req = payload.toRequestBody(RequestBodyTypes.JSON.toMediaTypeOrNull())
+        return app.post(apiUrl, requestBody = req, referer = "$mainUrl/").text
+    }
+
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val sortAttribute = request.data
         val payload =
-            """{         "query": "query GetClassesByType(${'$'}filter: ClassFilters!, ${'$'}pageSize: Int, ${'$'}cursor: String, ${'$'}type: ClassListType!, ${'$'}sortAttribute: ClassListByTypeSortAttribute) {             classListByType(type: ${'$'}type, where: ${'$'}filter, first: ${'$'}pageSize, after: ${'$'}cursor, sortAttribute: ${'$'}sortAttribute) {                 nodes {                     id                     title                     url                     sku                     smallCoverUrl                     largeCoverUrl                     studentCount                     durationInSeconds                     __typename                 }             }         }",         "variables": {             "type": "TRENDING_CLASSES",             "filter": {                 "subCategory": "",                 "classLength": []             },             "pageSize": 30,             "cursor": "$cursor",             "sortAttribute": "$sortAttribute"         },         "operationName": "GetClassesByType"     }"""
-        val body = payload.toRequestBody("application/json".toMediaType())
-        val r = Request.Builder()
-            .url(apiUrl)
-            .post(body)
-            .build()
-
-        val response = client.newCall(r).execute()
-        val responseBody = response.body.string()
+            """{         "query": "query GetClassesByType(${'$'}filter: ClassFilters!, ${'$'}pageSize: Int, ${'$'}cursor: String, ${'$'}type: ClassListType!, ${'$'}sortAttribute: ClassListByTypeSortAttribute) {             classListByType(type: ${'$'}type, where: ${'$'}filter, first: ${'$'}pageSize, after: ${'$'}cursor, sortAttribute: ${'$'}sortAttribute) {                 nodes {                     id                     title                     url                     sku                     smallCoverUrl                     largeCoverUrl                 }             }         }",         "variables": {             "type": "TRENDING_CLASSES",             "filter": {                 "subCategory": "",                 "classLength": []             },             "pageSize": 30,             "cursor": "${cursor[sortAttribute]}",             "sortAttribute": "$sortAttribute"         },         "operationName": "GetClassesByType"     }"""
+        val responseBody = queryMovieApi(payload)
         val parsedJson = parseJson<ApiData>(responseBody).data!!.classListByType!!.nodes
         val home = parsedJson.map {
             it.toSearchResult()
         }
         home.let {
-            cursor =
+            cursor[sortAttribute] =
                 parsedJson.last().id.toString()
         }
         return newHomePageResponse(
@@ -63,13 +59,7 @@ class SkillShareProvider : MainAPI() { // all providers must be an instance of M
     override suspend fun search(query: String): List<SearchResponse> {
         val payload =
             """{"query":"fragment ClassFields on Class {\n  id\n\tsmallCoverUrl\n  largeCoverUrl\n  sku\n  title\n  url\n}\n\nquery GetClassesQuery(${"$"}query: String!, ${"$"}where: SearchFilters!, ${"$"}after: String!, ${"$"}first: Int!) {\n  search(query: ${"$"}query, where: ${"$"}where, analyticsTags: [\"src:browser\", \"src:browser:search\"], after: ${"$"}after, first: ${"$"}first) {\n    edges {\n      node {\n        ...ClassFields\n      }\n    }\n  }\n}\n","variables":{"query":"$query","where":{"level":["ALL_LEVELS","BEGINNER","INTERMEDIATE","ADVANCED"]},"after":"-1","first":30},"operationName":"GetClassesQuery"}"""
-        val body = payload.toRequestBody("application/json".toMediaType())
-        val r = Request.Builder()
-            .url(apiUrl)
-            .post(body)
-            .build()
-        val response = client.newCall(r).execute()
-        val responseBody = response.body.string()
+        val responseBody = queryMovieApi(payload)
         val home = parseJson<SearchApiData>(responseBody).data!!.search!!.edges.map {
             it.node!!.toSearchResult()
         }
@@ -99,7 +89,7 @@ class SkillShareProvider : MainAPI() { // all providers must be an instance of M
             .parsedSafe<BypassApiData>() ?: throw ErrorLoadingException("Invalid Json Response")
         val title = data.title ?: ""
         val poster = data.largeCoverUrl
-        val episodeList = document.lessons.mapIndexed() { index, episode ->
+        val episodeList = document.lessons.mapIndexed { index, episode ->
             Episode(episode.url ?: "", episode.title, 1, index)
         }
 
@@ -120,7 +110,7 @@ class SkillShareProvider : MainAPI() { // all providers must be an instance of M
                 name,
                 data,
                 isM3u8 = false,
-                referer = mainUrl,
+                referer = "$mainUrl/",
                 quality = Qualities.Unknown.value
             )
         )
