@@ -151,7 +151,7 @@ class SkillShareProvider : MainAPI() { // all providers must be an instance of M
             Episode(episode.url ?: "", episode.title, 1, index)
         }
 
-        return newTvSeriesLoadResponse(title, data.courseId ?: return null, TvType.TvSeries, episodeList) {
+        return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodeList) {
             addPoster(poster)
         }
     }
