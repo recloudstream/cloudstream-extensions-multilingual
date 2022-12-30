@@ -18,7 +18,7 @@ class SkillShareProvider : MainAPI() { // all providers must be an instance of M
     override var name = "SkillShare"
 
     private val apiUrl = "https://www.skillshare.com/api/graphql"
-    private val bypassApiUrl = "https://skillshare-api.heckernohecking.repl.co"
+    private val bypassApiUrl = "https://skillshare.techtanic.xyz/id"
 
     override val supportedTypes = setOf(TvType.Others)
     override val hasChromecastSupport = true
@@ -143,7 +143,7 @@ class SkillShareProvider : MainAPI() { // all providers must be an instance of M
 
     override suspend fun load(url: String): LoadResponse? {
         val data = parseJson<Data>(url)
-        val document = app.get(bypassApiUrl + "/${data.courseId}/0")
+        val document = app.get(bypassApiUrl + "/${data.courseId}")
             .parsedSafe<BypassApiData>() ?: throw ErrorLoadingException("Invalid Json Response")
         val title = data.title ?: ""
         val poster = data.largeCoverUrl
