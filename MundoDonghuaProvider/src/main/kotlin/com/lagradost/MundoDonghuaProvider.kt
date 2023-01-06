@@ -93,6 +93,7 @@ class MundoDonghuaProvider : MainAPI() {
 
     override suspend fun load(url: String): LoadResponse {
         val doc = app.get(url, timeout = 120).document
+        val docSpecial = app.get(mainUrl, timeout = 120).document
         val poster = doc.selectFirst("head meta[property=og:image]")?.attr("content") ?: ""
         val title = doc.selectFirst(".ls-title-serie")?.text() ?: ""
         val description = doc.selectFirst("p.text-justify.fc-dark")?.text() ?: ""
@@ -102,16 +103,26 @@ class MundoDonghuaProvider : MainAPI() {
             "Finalizada" -> ShowStatus.Completed
             else -> null
         }
+        val specialEpisodes = docSpecial.select("div.sm-row.bg-white.pt-10.pr-20.pb-15.pl-20 div.item.col-lg-2.col-md-2.col-xs-4").mapNotNull {
+            val name = it.selectFirst("h5")?.text()?.replace("Episodio","-") ?: ""
+            val link = it.selectFirst("a")?.attr("href") ?: ""
+            if (name.contains(title, true)) {
+                Episode(fixUrl(link), name)
+            } else {
+                null
+            }
+        }.reversed()
         val episodes = doc.select("ul.donghua-list a").map {
             val name = it.selectFirst(".fs-16")?.text()
             val link = it.attr("href")
             Episode(fixUrl(link), name)
         }.reversed()
+        val episodesFinal = episodes + specialEpisodes
         val typeinfo = doc.select("div.row div.col-md-6.pl-15 p.fc-dark").text()
         val tvType = if (typeinfo.contains(Regex("Tipo.*Pel.cula"))) TvType.AnimeMovie else TvType.Anime
         return newAnimeLoadResponse(title, url, tvType) {
             posterUrl = poster
-            addEpisodes(DubStatus.Subbed, episodes)
+            addEpisodes(DubStatus.Subbed, episodesFinal)
             showStatus = status
             plot = description
             tags = genres
